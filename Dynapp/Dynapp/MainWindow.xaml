@@ -97,10 +97,10 @@
 
         <GroupBox Header="SCRIPT RUNNER" Padding="10,8">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <Button Content="ファイルを選択" Padding="10,4" Background="#F0F0F0"/>
-                <TextBlock Text="選択されていません" VerticalAlignment="Center" Margin="10,0,20,0" Foreground="Gray"/>
-                <Button Content="RUN" Padding="15,4" Margin="0,0,10,0" Background="#F0F0F0"/>
-                <Button Content="STOP" Padding="15,4" Background="#FF4D4D" Foreground="White" FontWeight="Bold" BorderBrush="{x:Null}"/>
+                <Button Command="{Binding LoadScriptCommand}" Content="ファイルを選択" Padding="10,4" Background="#F0F0F0"/>
+                <TextBlock Text="{Binding ScriptFileName}" VerticalAlignment="Center" Margin="10,0,20,0" Foreground="Gray"/>
+                <Button Command="{Binding RunScriptCommand}" Content="RUN" Padding="15,4" Margin="0,0,10,0" Background="#F0F0F0"/>
+                <Button Command="{Binding StopScriptCommand}" Content="STOP" Padding="15,4" Background="#FF4D4D" Foreground="White" FontWeight="Bold" BorderBrush="{x:Null}"/>
             </StackPanel>
         </GroupBox>
 
