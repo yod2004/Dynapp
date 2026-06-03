@@ -35,13 +35,20 @@ namespace Dynapp
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+        private readonly DynamixelModel _dynamixelModel = new DynamixelModel();
+        public MotorViewModel[] Motors { get; }
 
         public MainViewModel()// コンストラクタ
         {
             RefreshPorts(); // 利用可能なCOMポートを最初に取得しておく
+            Motors = new MotorViewModel[]
+            {
+                new MotorViewModel(1, _dynamixelModel),
+                new MotorViewModel(2, _dynamixelModel),
+                new MotorViewModel(3, _dynamixelModel)
+            };
         }
 
-        private readonly DynamixelModel _dynamixelModel = new DynamixelModel();
 
         private string _ConnectionStatus = "未接続";
         public string ConnectionStatus
@@ -67,17 +74,25 @@ namespace Dynapp
             {
                 while (_IsPolling)
                 {
-                    // 1. Modelを使って現在位置を取得
-                    int currentPos = _dynamixelModel.GetPresentPosition(1);
-
-                    // 2. ViewModelのプロパティを更新（すると自動的に画面の数字が変わる！）
-                    Motor1NowValue = currentPos;
+                    foreach (var motor in Motors)
+                    {
+                        motor.NowValue = _dynamixelModel.GetPresentPosition(motor.MotorId);
+                    }
 
                     // 3. 少し休む（50ミリ秒待機 = 1秒間に20回更新）
                     // ※これを入れないと全力で通信してエラーになるので必須です
                     await Task.Delay(50);
                 }
             });
+        }
+
+        public DelegateCommand AllEnableCommand => new DelegateCommand(AllEnable);
+        void AllEnable()
+        {
+            foreach (var motor in Motors)
+            {
+               motor.IsEnable = true;
+            }
         }
 
         public DelegateCommand UsbConnectCommand => new DelegateCommand(UsbConnect);
@@ -104,120 +119,6 @@ namespace Dynapp
             else
             {
                 ConnectionStatus = "接続失敗";
-            }
-        }
-
-        private bool _IsMotor1Led;
-        public bool IsMotor1Led
-        {
-            get { return _IsMotor1Led; }
-            set
-            {
-                if (_IsMotor1Led != value)
-                {
-                    _IsMotor1Led = value;
-                    NotifyPropertyChanged(nameof(IsMotor1Led));
-                    _dynamixelModel.SetLed(1, value);
-                }
-            }
-        }
-        private bool _IsMotor1Enable;
-        public bool IsMotor1Enable
-        {
-            get { return _IsMotor1Enable; }
-            set
-            {
-                if (_IsMotor1Enable != value)
-                {
-                    _IsMotor1Enable = value;
-                    NotifyPropertyChanged(nameof(IsMotor1Enable));
-                    _dynamixelModel.SetTorqueEnable(1, value);
-                }
-            }
-        }
-        private int _Motor1ModeIndex = 3;
-        public int Motor1ModeIndex
-        {
-            get { return _Motor1ModeIndex; }
-            set
-            {
-                if (_Motor1ModeIndex != value)
-                {
-                    _Motor1ModeIndex = value;
-                    NotifyPropertyChanged(nameof(Motor1ModeIndex));
-                }
-            }
-        }
-
-        private int _Motor1NowValue = 0;
-        public int Motor1NowValue
-        {
-            get { return _Motor1NowValue; }
-            set
-            {
-                if (_Motor1NowValue != value)
-                {
-                    _Motor1NowValue = value;
-                    NotifyPropertyChanged(nameof(Motor1NowValue));
-                }
-            }
-        }
-
-        private int _Motor1TargetValue = 0;
-        public int Motor1TargetValue
-        {
-            get { return _Motor1TargetValue; }
-            set
-            {
-                if (_Motor1TargetValue != value)
-                {
-                    _Motor1TargetValue = value;
-                    NotifyPropertyChanged(nameof(Motor1TargetValue));
-                    _dynamixelModel.SetGoalPosition(1, value);
-                }
-            }
-        }
-
-        private int _Motor1SliderMin = -4095;
-        public int Motor1SliderMin
-        {
-            get { return _Motor1SliderMin; }
-            set
-            {
-                if (_Motor1SliderMin != value)
-                {
-                    _Motor1SliderMin = value;
-                    NotifyPropertyChanged(nameof(Motor1SliderMin));
-                }
-            }
-        }
-
-        private int _Motor1SliderMax = 4095;
-        public int Motor1SliderMax
-        {
-            get { return _Motor1SliderMax; }
-            set
-            {
-                if (_Motor1SliderMax != value)
-                {
-                    _Motor1SliderMax = value;
-                    NotifyPropertyChanged(nameof(Motor1SliderMax));
-                }
-            }
-        }
-
-        private int _Motor1SliderValue = 0;
-        public int Motor1SliderValue
-        {
-            get { return _Motor1SliderValue; }
-            set
-            {
-                Motor1TargetValue = value;
-                if (_Motor1SliderValue != value)
-                {
-                    _Motor1SliderValue = value;
-                    NotifyPropertyChanged(nameof(Motor1SliderValue));
-                }
             }
         }
 

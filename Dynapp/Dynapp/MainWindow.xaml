@@ -12,22 +12,22 @@
             <ComboBox ItemsSource="{Binding AvailablePorts}" SelectedItem="{Binding SelectedPort}"/>
             <Button Command="{Binding RefreshPortsCommand}" Content="Refresh" Padding="8,4" Margin="0,0,10,0" Background="#F0F0F0"/>
             <Button Command="{Binding UsbConnectCommand}" Content="CONNECT USB" Padding="8,4" Margin="0,0,10,0" Background="#F0F0F0"/>
-            <Button Content="ALL ENABLE" Padding="8,4" Background="#F0F0F0"/>
+            <Button Command="{Binding AllEnableCommand}" Content="ALL ENABLE" Padding="8,4" Background="#F0F0F0"/>
             <TextBlock Text="{Binding ConnectionStatus}" VerticalAlignment="Center"/>
         </StackPanel>
 
-        <GroupBox Header="MOTOR1" Margin="0,0,0,15" Padding="10,5">
+        <GroupBox Header="MOTOR1" DataContext="{Binding Motors[0]}" Margin="0,0,0,15" Padding="10,5">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <TextBlock Text="ID:" VerticalAlignment="Center" Margin="0,0,5,0"/>
                 <TextBox Text="1" Width="60" Height="24" VerticalContentAlignment="Center"/>
 
                 <TextBlock Text="LED:" VerticalAlignment="Center" Margin="15,0,5,0"/>
-                <CheckBox IsChecked="{Binding IsMotor1Led}" VerticalAlignment="Center"/>
+                <CheckBox IsChecked="{Binding IsLed}" VerticalAlignment="Center"/>
 
                 <TextBlock Text="ENABLE:" VerticalAlignment="Center" Margin="15,0,5,0"/>
-                <CheckBox IsChecked="{Binding IsMotor1Enable}" VerticalAlignment="Center"/>
+                <CheckBox IsChecked="{Binding IsEnable}" VerticalAlignment="Center"/>
 
-                <ComboBox SelectedIndex="{Binding Motor1ModeIndex}" Width="140" Height="24" Margin="15,0,0,0" VerticalContentAlignment="Center">
+                <ComboBox SelectedIndex="{Binding ModeIndex}" Width="140" Height="24" Margin="15,0,0,0" VerticalContentAlignment="Center">
                     <ComboBoxItem Content="Current"/>
                     <ComboBoxItem Content="Speed"/>
                     <ComboBoxItem Content="Position"/>
@@ -35,54 +35,65 @@
                 </ComboBox>
 
                 <TextBlock Text="A←" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                <Slider Width="180" VerticalAlignment="Center" Minimum="{Binding Motor1SliderMin}" Maximum="{Binding Motor1SliderMax}" Value="{Binding Motor1SliderValue}"/>
+                <Slider Width="180" VerticalAlignment="Center" Minimum="{Binding SliderMin}" Maximum="{Binding SliderMax}" Value="{Binding SliderValue}"/>
                 <TextBlock Text="→D" VerticalAlignment="Center" Margin="5,0,10,0"/>
-                <TextBlock Text="{Binding Motor1TargetValue}" Width="60" VerticalAlignment="Center"/>
-                <TextBlock Text="{Binding Motor1NowValue}" Width="60" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding TargetValue}" Width="60" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding NowValue}" Width="60" VerticalAlignment="Center"/>
             </StackPanel>
         </GroupBox>
 
-        <GroupBox Header="MOTOR2" Margin="0,0,0,15" Padding="10,5">
+        <GroupBox Header="MOTOR2" DataContext="{Binding Motors[1]}" Margin="0,0,0,15" Padding="10,5">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <TextBlock Text="ID:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                <TextBox Text="2" Width="60" Height="24" VerticalContentAlignment="Center"/>
+                <TextBox Text="1" Width="60" Height="24" VerticalContentAlignment="Center"/>
 
                 <TextBlock Text="LED:" VerticalAlignment="Center" Margin="15,0,5,0"/>
-                <CheckBox VerticalAlignment="Center"/>
+                <CheckBox IsChecked="{Binding IsLed}" VerticalAlignment="Center"/>
 
                 <TextBlock Text="ENABLE:" VerticalAlignment="Center" Margin="15,0,5,0"/>
-                <CheckBox VerticalAlignment="Center"/>
+                <CheckBox IsChecked="{Binding IsEnable}" VerticalAlignment="Center"/>
 
-                <ComboBox Width="140" Height="24" Margin="15,0,0,0" SelectedIndex="0" VerticalContentAlignment="Center">
+                <ComboBox SelectedIndex="{Binding ModeIndex}" Width="140" Height="24" Margin="15,0,0,0" VerticalContentAlignment="Center">
+                    <ComboBoxItem Content="Current"/>
+                    <ComboBoxItem Content="Speed"/>
+                    <ComboBoxItem Content="Position"/>
                     <ComboBoxItem Content="Extended Position"/>
                 </ComboBox>
 
-                <TextBlock Text="J←" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                <Slider Width="180" VerticalAlignment="Center" Minimum="0" Maximum="100" Value="50"/>
-                <TextBlock Text="→L 0 0" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                <TextBlock Text="A←" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                <Slider Width="180" VerticalAlignment="Center" Minimum="{Binding SliderMin}" Maximum="{Binding SliderMax}" Value="{Binding SliderValue}"/>
+                <TextBlock Text="→D" VerticalAlignment="Center" Margin="5,0,10,0"/>
+                <TextBlock Text="{Binding TargetValue}" Width="60" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding NowValue}" Width="60" VerticalAlignment="Center"/>
             </StackPanel>
         </GroupBox>
 
-        <GroupBox Header="MOTOR3" Margin="0,0,0,15" Padding="10,5">
+        <GroupBox Header="MOTOR3" DataContext="{Binding Motors[2]}" Margin="0,0,0,15" Padding="10,5">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <TextBlock Text="ID:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                <TextBox Text="3" Width="60" Height="24" VerticalContentAlignment="Center"/>
+                <TextBox Text="1" Width="60" Height="24" VerticalContentAlignment="Center"/>
 
                 <TextBlock Text="LED:" VerticalAlignment="Center" Margin="15,0,5,0"/>
-                <CheckBox VerticalAlignment="Center"/>
+                <CheckBox IsChecked="{Binding IsLed}" VerticalAlignment="Center"/>
 
                 <TextBlock Text="ENABLE:" VerticalAlignment="Center" Margin="15,0,5,0"/>
-                <CheckBox VerticalAlignment="Center"/>
+                <CheckBox IsChecked="{Binding IsEnable}" VerticalAlignment="Center"/>
 
-                <ComboBox Width="140" Height="24" Margin="15,0,0,0" SelectedIndex="0" VerticalContentAlignment="Center">
+                <ComboBox SelectedIndex="{Binding ModeIndex}" Width="140" Height="24" Margin="15,0,0,0" VerticalContentAlignment="Center">
+                    <ComboBoxItem Content="Current"/>
+                    <ComboBoxItem Content="Speed"/>
+                    <ComboBoxItem Content="Position"/>
                     <ComboBoxItem Content="Extended Position"/>
                 </ComboBox>
 
-                <TextBlock Text="F←" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                <Slider Width="180" VerticalAlignment="Center" Minimum="0" Maximum="100" Value="50"/>
-                <TextBlock Text="→H 0 0" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                <TextBlock Text="A←" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                <Slider Width="180" VerticalAlignment="Center" Minimum="{Binding SliderMin}" Maximum="{Binding SliderMax}" Value="{Binding SliderValue}"/>
+                <TextBlock Text="→D" VerticalAlignment="Center" Margin="5,0,10,0"/>
+                <TextBlock Text="{Binding TargetValue}" Width="60" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding NowValue}" Width="60" VerticalAlignment="Center"/>
             </StackPanel>
         </GroupBox>
+
 
         <GroupBox Header="SCRIPT RUNNER" Padding="10,8">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">

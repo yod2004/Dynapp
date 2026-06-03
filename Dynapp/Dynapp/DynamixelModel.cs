@@ -13,6 +13,7 @@ namespace Dynapp
         private const int ADDR_GOAL_POSITION = 116;
         private const int ADDR_PRESENT_POSITION = 132; // 現在位置のアドレス
         private int _portNum = -1;
+        private readonly object _lockObj = new object();
 
         /// <summary>
         /// 指定したCOMポートとボーレートでDynamixelと接続する
@@ -62,20 +63,29 @@ namespace Dynapp
         {
             if(_portNum == -1) return; // 未接続なら何もしない
             byte ledValue = (byte)(turnOn ? 1 : 0);
-            Dynamixel.write1ByteTxRx(_portNum, PROTOCOL_VERSION, motorId, ADDR_X_LED, ledValue);
+            lock (_lockObj)
+            {
+                Dynamixel.write1ByteTxRx(_portNum, PROTOCOL_VERSION, motorId, ADDR_X_LED, ledValue);
+            }
         }
 
         public void SetTorqueEnable(byte motorId, bool enable)
         {
             if(_portNum == -1) return; // 未接続なら何もしない
             byte enableValue = (byte)(enable ? 1 : 0);
-            Dynamixel.write1ByteTxRx(_portNum, PROTOCOL_VERSION, motorId, ADDR_TORQUE_ENABLE, enableValue);
+            lock (_lockObj)
+            {
+               Dynamixel.write1ByteTxRx(_portNum, PROTOCOL_VERSION, motorId, ADDR_TORQUE_ENABLE, enableValue);
+            }
         }
 
         public void SetGoalPosition(byte motorId, int target)
         {
             if (_portNum == -1) return; // 未接続なら何もしない
-            Dynamixel.write4ByteTxRx(_portNum, PROTOCOL_VERSION, motorId, ADDR_GOAL_POSITION, (uint)target);
+            lock (_lockObj)
+            {
+                Dynamixel.write4ByteTxRx(_portNum, PROTOCOL_VERSION, motorId, ADDR_GOAL_POSITION, (uint)target);
+            }
         }
 
         /// <summary>
@@ -84,12 +94,14 @@ namespace Dynapp
         public int GetPresentPosition(byte motorId)
         {
             if (_portNum == -1) return 0; // 未接続なら0を返す
-
-            // 4バイト読み込みの関数を使う
-            uint presentPosition = Dynamixel.read4ByteTxRx(_portNum, PROTOCOL_VERSION, motorId, ADDR_PRESENT_POSITION);
+            lock (_lockObj)
+            {
+                // 4バイト読み込みの関数を使う
+                uint presentPosition = Dynamixel.read4ByteTxRx(_portNum, PROTOCOL_VERSION, motorId, ADDR_PRESENT_POSITION);
             
-            // dynamixelの関数は符号なし(uint)で返してくるので、intに変換して返す
-            return (int)presentPosition;
+                // dynamixelの関数は符号なし(uint)で返してくるので、intに変換して返す
+                return (int)presentPosition;
+            }
         }
     }
 }
