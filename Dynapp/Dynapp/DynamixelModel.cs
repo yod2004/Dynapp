@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using dynamixel_sdk;
+using System.Collections.Generic;
 
 namespace Dynapp
 {
@@ -12,8 +13,10 @@ namespace Dynapp
         private const int PROTOCOL_VERSION = 2;
         private const int ADDR_GOAL_POSITION = 116;
         private const int ADDR_PRESENT_POSITION = 132; // 現在位置のアドレス
+        private const int LEN_PRESENT_POSITION = 4; // 現在位置のデータ長（4byte）
         private int _portNum = -1;
         private readonly object _lockObj = new object();
+        private int _groupSyncReadNum = -1;
 
         /// <summary>
         /// 指定したCOMポートとボーレートでDynamixelと接続する
@@ -41,7 +44,7 @@ namespace Dynapp
                 Dynamixel.closePort(_portNum);
                 return false;
             }
-
+            _groupSyncReadNum = Dynamixel.groupSyncRead(_portNum, PROTOCOL_VERSION, ADDR_PRESENT_POSITION, LEN_PRESENT_POSITION);
             System.Diagnostics.Debug.WriteLine($"接続成功: {portName} ({baudRate} bps)");
             return true;
         }
@@ -101,6 +104,42 @@ namespace Dynapp
             
                 // dynamixelの関数は符号なし(uint)で返してくるので、intに変換して返す
                 return (int)presentPosition;
+            }
+        }
+
+        /// <summary>
+        /// 複数のモーターの現在位置を一括で取得する (GroupSyncRead)
+        /// </summary>
+        public Dictionary<byte, int> ReadAllPositions(byte[] motorIds)
+        {
+            // 未接続、またはグループが作られていなければ null を返す
+            if (_portNum == -1 || _groupSyncReadNum == -1) return null;
+
+            lock (_lockObj)
+            {
+                // 1. 前回の通信の登録リストをリセット
+                Dynamixel.groupSyncReadClearParam(_groupSyncReadNum);
+
+                // 2. 今回読み取りたいモーターのIDをリストに追加
+                foreach (byte id in motorIds)
+                {
+                    Dynamixel.groupSyncReadAddParam(_groupSyncReadNum, id);
+                }
+
+                // 3. 全員に向けて「現在位置を教えろ！」と一斉送信＆一括受信（通信はこれ1回だけ！）
+                Dynamixel.groupSyncReadTxRxPacket(_groupSyncReadNum);
+
+                // 4. 受け取った結果を辞書（ID -> 現在位置）にまとめる
+                var results = new Dictionary<byte, int>();
+                foreach (byte id in motorIds)
+                {
+                    // データが正しく届いているか確認
+                    if (Dynamixel.groupSyncReadIsAvailable(_groupSyncReadNum, id, ADDR_PRESENT_POSITION, LEN_PRESENT_POSITION))
+                    {
+                        results[id] = (int)Dynamixel.groupSyncReadGetData(_groupSyncReadNum, id, ADDR_PRESENT_POSITION, LEN_PRESENT_POSITION);
+                    }
+                }
+                return results;
             }
         }
     }

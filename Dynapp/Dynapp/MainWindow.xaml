@@ -10,16 +10,16 @@
 
         <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
             <ComboBox ItemsSource="{Binding AvailablePorts}" SelectedItem="{Binding SelectedPort}"/>
-            <Button Command="{Binding RefreshPortsCommand}" Content="Refresh" Padding="8,4" Margin="0,0,10,0" Background="#F0F0F0"/>
+            <Button Command="{Binding RefreshPortsCommand}" Content="↻" Padding="8,4" Margin="0,0,10,0" Background="#F0F0F0"/>
             <Button Command="{Binding UsbConnectCommand}" Content="CONNECT USB" Padding="8,4" Margin="0,0,10,0" Background="#F0F0F0"/>
-            <Button Command="{Binding AllEnableCommand}" Content="ALL ENABLE" Padding="8,4" Background="#F0F0F0"/>
+            <Button Command="{Binding AllEnableCommand}" Content="ALL ENABLE" Padding="8,4" Margin="0,0,10,0" Background="#F0F0F0"/>
             <TextBlock Text="{Binding ConnectionStatus}" VerticalAlignment="Center"/>
         </StackPanel>
 
         <GroupBox Header="MOTOR1" DataContext="{Binding Motors[0]}" Margin="0,0,0,15" Padding="10,5">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <TextBlock Text="ID:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                <TextBox Text="1" Width="60" Height="24" VerticalContentAlignment="Center"/>
+                <TextBox Text="{Binding Id}" Width="60" Height="24" VerticalContentAlignment="Center"/>
 
                 <TextBlock Text="LED:" VerticalAlignment="Center" Margin="15,0,5,0"/>
                 <CheckBox IsChecked="{Binding IsLed}" VerticalAlignment="Center"/>
@@ -45,7 +45,7 @@
         <GroupBox Header="MOTOR2" DataContext="{Binding Motors[1]}" Margin="0,0,0,15" Padding="10,5">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <TextBlock Text="ID:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                <TextBox Text="1" Width="60" Height="24" VerticalContentAlignment="Center"/>
+                <TextBox Text="{Binding Id}" Width="60" Height="24" VerticalContentAlignment="Center"/>
 
                 <TextBlock Text="LED:" VerticalAlignment="Center" Margin="15,0,5,0"/>
                 <CheckBox IsChecked="{Binding IsLed}" VerticalAlignment="Center"/>
@@ -71,7 +71,7 @@
         <GroupBox Header="MOTOR3" DataContext="{Binding Motors[2]}" Margin="0,0,0,15" Padding="10,5">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <TextBlock Text="ID:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                <TextBox Text="1" Width="60" Height="24" VerticalContentAlignment="Center"/>
+                <TextBox Text="{Binding Id}" Width="60" Height="24" VerticalContentAlignment="Center"/>
 
                 <TextBlock Text="LED:" VerticalAlignment="Center" Margin="15,0,5,0"/>
                 <CheckBox IsChecked="{Binding IsLed}" VerticalAlignment="Center"/>

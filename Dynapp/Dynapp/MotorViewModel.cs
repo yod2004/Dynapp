@@ -17,7 +17,22 @@ namespace Dynapp
         public MotorViewModel(byte id, DynamixelModel dynamixelModel)
         {
             MotorId = id;
+            Id = id;
             _dynamixelModel = dynamixelModel;
+        }
+
+        private int _Id;
+        public int Id
+        {
+            get { return _Id; }
+            set
+            {
+                if (_Id != value)
+                {
+                    _Id = value;
+                    NotifyPropertyChanged();
+                }
+            }
         }
 
         private bool _IsLed;

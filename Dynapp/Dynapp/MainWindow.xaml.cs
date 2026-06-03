@@ -13,6 +13,7 @@ using System.Windows.Shapes;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using System.IO.Ports;
+using System.Linq;
 
 namespace Dynapp
 {
@@ -69,16 +70,24 @@ namespace Dynapp
         {
             _IsPolling = true;
 
+            byte[] targetIds = Motors.Select(m => m.MotorId).ToArray();
+
             // Task.Run で裏方のスレッド（別作業員）にループ処理を丸投げする
             await Task.Run(async () =>
             {
                 while (_IsPolling)
                 {
-                    foreach (var motor in Motors)
+                    var positions = _dynamixelModel.ReadAllPositions(targetIds);
+                    if(positions != null)
                     {
-                        motor.NowValue = _dynamixelModel.GetPresentPosition(motor.MotorId);
+                        foreach(var motor in Motors) 
+                        {
+                            if(positions.ContainsKey(motor.MotorId))
+                            {
+                                motor.NowValue = positions[motor.MotorId];
+                            }
+                        }
                     }
-
                     // 3. 少し休む（50ミリ秒待機 = 1秒間に20回更新）
                     // ※これを入れないと全力で通信してエラーになるので必須です
                     await Task.Delay(50);
