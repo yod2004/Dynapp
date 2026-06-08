@@ -4,8 +4,9 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Dynapp"
+        xmlns:ScottPlot="clr-namespace:ScottPlot.WPF;assembly=ScottPlot.WPF"
         mc:Ignorable="d"
-        Title="MainWindow" Height="AUTO" Width="AUTO">
+        Title="MainWindow" Height="AUTO" Width="800">
     <StackPanel Margin="15">
 
         <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
@@ -102,6 +103,10 @@
                 <Button Command="{Binding RunScriptCommand}" Content="RUN" Padding="15,4" Margin="0,0,10,0" Background="#F0F0F0"/>
                 <Button Command="{Binding StopScriptCommand}" Content="STOP" Padding="15,4" Background="#FF4D4D" Foreground="White" FontWeight="Bold" BorderBrush="{x:Null}"/>
             </StackPanel>
+        </GroupBox>
+
+        <GroupBox Header="GRAPH" Padding="10,8">
+            <ScottPlot:WpfPlot Name="WpfPlot1" Height="300"/>
         </GroupBox>
 
     </StackPanel>

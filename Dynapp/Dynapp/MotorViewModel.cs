@@ -11,13 +11,12 @@ namespace Dynapp
         private readonly DynamixelModel _dynamixelModel;
 
         // 自分のモーターIDを保持する
-        public byte MotorId { get; }
+        public byte MotorId => (byte)Id;
 
         // コンストラクタでIDと通信モデルを受け取る
         public MotorViewModel(byte id, DynamixelModel dynamixelModel)
         {
-            MotorId = id;
-            Id = id;
+            _Id = id;
             _dynamixelModel = dynamixelModel;
         }
 
@@ -45,7 +44,7 @@ namespace Dynapp
                 {
                     _IsLed = value;
                     NotifyPropertyChanged();
-                    _dynamixelModel.SetLed(MotorId, value); // 自分のIDを使う！
+                    Task.Run(() => _dynamixelModel.SetLed(MotorId, value)); // 自分のIDを使う！
                 }
             }
         }
@@ -60,7 +59,7 @@ namespace Dynapp
                 {
                     _IsEnable = value;
                     NotifyPropertyChanged();
-                    _dynamixelModel.SetTorqueEnable(MotorId, value); // 自分のIDを使う！
+                    Task.Run(()=>_dynamixelModel.SetTorqueEnable(MotorId, value)); // 自分のIDを使う！
                 }
             }
         }
@@ -89,7 +88,7 @@ namespace Dynapp
                 {
                     _TargetValue = value;
                     NotifyPropertyChanged();
-                    _dynamixelModel.SetGoalPosition(MotorId, value); // 自分のIDを使う！
+                    Task.Run(()=>_dynamixelModel.SetGoalPosition(MotorId, value)); // 自分のIDを使う！
                 }
             }
         }
@@ -100,11 +99,11 @@ namespace Dynapp
             get => _SliderValue;
             set
             {
-                TargetValue = value;
                 if (_SliderValue != value)
                 {
                     _SliderValue = value;
                     NotifyPropertyChanged();
+                    TargetValue = value;
                 }
             }
 

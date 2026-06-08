@@ -1,6 +1,12 @@
-﻿using System.ComponentModel;
+﻿using ScottPlot;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
+using System.IO.Ports;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -10,11 +16,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
-using System.Diagnostics;
-using System.Threading.Tasks;
-using System.IO.Ports;
-using System.Linq;
-using System.IO;
+using System.Windows.Threading;
 
 namespace Dynapp
 {
@@ -23,14 +25,61 @@ namespace Dynapp
     /// </summary>
     public partial class MainWindow : Window
     {
+        // グラフ用のロガー
+        private ScottPlot.Plottables.DataLogger[] _loggers = new ScottPlot.Plottables.DataLogger[3];
+
+        // グラフ描画更新用のタイマー
+        private DispatcherTimer _renderTimer;
         public MainWindow()
         {
             InitializeComponent();
-            this.DataContext = new MainViewModel();
+            var vm = new MainViewModel();
+            this.DataContext = vm;
+
+            // グラフの初期化
+            InitGraph();
+
+            // ViewModelの「電流データ受信イベント」を購読（フック）する
+            vm.CurrentDataReceived += OnCurrentDataReceived;
+
+            // グラフを定期的に再描画するタイマーの設定（約30FPS）
+            _renderTimer = new DispatcherTimer();
+            _renderTimer.Interval = TimeSpan.FromMilliseconds(33);
+            _renderTimer.Tick += (s, e) => WpfPlot1.Refresh();
+            _renderTimer.Start();
+        }
+        private void InitGraph()
+        {
+            var plot = WpfPlot1.Plot;
+            plot.Title("Motor Current Monitor");
+            plot.YLabel("Current (mA)");
+
+            ScottPlot.Color[] colors = { ScottPlot.Colors.Red, ScottPlot.Colors.Blue, ScottPlot.Colors.Green };
+            for (int i = 0; i < 3; i++)
+            {
+                _loggers[i] = plot.Add.DataLogger();
+                _loggers[i].Color = colors[i];
+                _loggers[i].LegendText = $"Motor {i + 1}";
+
+                // 【オプション】最新の500データポイントだけ表示してスクロールさせる設定
+                _loggers[i].ManageAxisLimits = true;
+                _loggers[i].ViewSlide(500);
+            }
+
+            plot.ShowLegend(Alignment.UpperRight);
+            WpfPlot1.Refresh();
+        }
+        // ViewModelから裏方スレッドで呼ばれるメソッド
+        private void OnCurrentDataReceived(double c1, double c2, double c3)
+        {
+            // DataLoggerへの追加は別スレッドからでも安全に行えます
+            _loggers[0].Add(c1);
+            _loggers[1].Add(c2);
+            _loggers[2].Add(c3);
         }
     }
 
-    public class MainViewModel : INotifyPropertyChanged
+        public class MainViewModel : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void NotifyPropertyChanged([CallerMemberName] string? propertyName = null)
@@ -64,6 +113,9 @@ namespace Dynapp
         }
         // ループを回し続けるかどうかのフラグ
         private bool _IsPolling = false;
+
+        public event Action<double, double, double>? CurrentDataReceived;
+
         /// <summary>
         /// 裏側でモーターの情報を定期的に取得し続ける非同期メソッド
         /// </summary>
@@ -88,6 +140,18 @@ namespace Dynapp
                                 motor.NowValue = positions[motor.MotorId];
                             }
                         }
+                    }
+                    // --- 【追加】電流値の取得と通知 ---
+                    // ※ DynamixelModelに電流を取得するメソッド (ReadAllCurrents等) を実装する必要があります
+                    var currents = _dynamixelModel.ReadAllCurrents(targetIds);
+                    if (currents != null)
+                    {
+                        double c1 = currents.ContainsKey(1) ? currents[1] : 0;
+                        double c2 = currents.ContainsKey(2) ? currents[2] : 0;
+                        double c3 = currents.ContainsKey(3) ? currents[3] : 0;
+
+                        // View側に「最新の電流値が取れたよ」と通知する
+                        CurrentDataReceived?.Invoke(c1, c2, c3);
                     }
                     // 3. 少し休む（50ミリ秒待機 = 1秒間に20回更新）
                     // ※これを入れないと全力で通信してエラーになるので必須です
