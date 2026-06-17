@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Windows;
 
 namespace Dynapp
 {
@@ -149,6 +150,142 @@ namespace Dynapp
                     NotifyPropertyChanged();
                 }
             }
+        }
+
+        private bool _IsShowGraph = true;
+        public bool IsShowGraph
+        {
+            get => _IsShowGraph;
+            set
+            {
+                if (_IsShowGraph != value)
+                {
+                    _IsShowGraph = value;
+                    NotifyPropertyChanged();
+                    if (value)
+                    {
+                        IsShowCurrentGraph = true;
+                        IsShowPositionGraph = true;
+                    }
+                    else
+                    {
+                        IsShowCurrentGraph = false;
+                        IsShowPositionGraph =false;
+                    }
+                }
+            }
+        }
+
+        private bool _IsShowCurrentGraph = true;
+        public bool IsShowCurrentGraph
+        {
+            get => _IsShowCurrentGraph;
+            set
+            {
+                if (_IsShowCurrentGraph != value)
+                {
+                    _IsShowCurrentGraph = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private bool _IsShowPositionGraph = true;
+        public bool IsShowPositionGraph
+        {
+            get => _IsShowPositionGraph;
+            set
+            {
+                if (_IsShowPositionGraph != value)
+                {
+                    _IsShowPositionGraph = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+
+        private ushort _ModelNumber = 0;
+        public ushort ModelNumber
+        {
+            get => _ModelNumber;
+            set
+            {
+                if (_ModelNumber != value)
+                {
+                    _ModelNumber = value;
+                    NotifyPropertyChanged();
+                    NotifyPropertyChanged(nameof(CurrentScale)); // 値が変わったらスケールも更新
+                    NotifyPropertyChanged(nameof(ModelName));    // 画面表示用の名前も更新
+                }
+            }
+        }
+        // ★ モデル番号から変換係数を自動で決定する
+        public double CurrentScale
+        {
+            get
+            {
+                // XM430, XH430, XM540 などのシリーズ（モデル番号 1000 ～ 1150付近）は 1単位 = 2.69mA
+                if (ModelNumber >= 1000 && ModelNumber <= 1150)
+                {
+                    return 2.69;
+                }
+
+                // XC330シリーズ (1210 ~ 1240) などは 1単位 = 1.0mA
+                // XL330は元々Current制御ができませんが、取得できた場合はそのまま1.0として扱います
+                return 1.0;
+            }
+        }
+        public string ModelName
+        {
+            get
+            {
+                switch (ModelNumber)
+                {
+                    case 1000: return "XH430-W350"; // 修正
+                    case 1010: return "XH430-W210"; // 修正
+                    case 1020: return "XM430-W350"; // 修正
+                    case 1030: return "XM430-W210"; // 修正
+                    case 1040: return "XH430-V350"; // 念のためVシリーズも追加
+                    case 1050: return "XH430-V210";
+                    case 1060: return "XL430-W250";
+
+                    case 1120: return "XM540-W150";
+                    case 1130: return "XM540-W270";
+
+                    case 1190: return "XL330-M288";
+                    case 1200: return "XL330-M077";
+
+                    case 1210: return "XC330-T181";
+                    case 1220: return "XC330-T288";
+                    case 1230: return "XC330-M181";
+                    case 1240: return "XC330-M288";
+
+                    case 0: return "Unknown";
+                    default: return $"Model:{ModelNumber}";
+                }
+            }
+        }
+
+        // --- MotorViewModel.cs の中に追加 ---
+
+        public DelegateCommand RebootCommand => new DelegateCommand(RebootMotor);
+
+        private void RebootMotor()
+        {
+            // UIをフリーズさせないよう、裏側スレッドで実行
+            Task.Run(async () =>
+            {
+                // Modelに再起動を指示
+                _dynamixelModel.Reboot(MotorId);
+
+                // 再起動には少し時間がかかるので少し待機
+                await Task.Delay(500);
+
+                // ハードウェアはトルクOFF状態に戻っているので、画面のチェックボックスも連動して外す
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    IsEnable = false;
+                });
+            });
         }
 
         // --- INotifyPropertyChanged の実装（お決まりのコード） ---

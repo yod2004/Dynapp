@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:Dynapp"
         xmlns:ScottPlot="clr-namespace:ScottPlot.WPF;assembly=ScottPlot.WPF"
         mc:Ignorable="d"
-        Title="MainWindow" Height="AUTO" Width="800">
+        Title="MainWindow" Height="AUTO" Width="1000">
     <StackPanel Margin="15">
 
         <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
@@ -15,85 +15,45 @@
             <Button Command="{Binding UsbConnectCommand}" Content="CONNECT USB" Padding="8,4" Margin="0,0,10,0" Background="#F0F0F0"/>
             <Button Command="{Binding AllEnableCommand}" Content="ALL ENABLE" Padding="8,4" Margin="0,0,10,0" Background="#F0F0F0"/>
             <TextBlock Text="{Binding ConnectionStatus}" VerticalAlignment="Center"/>
+            <Button Content="Scan" Command="{Binding ScanCommand}"/>
         </StackPanel>
 
-        <GroupBox Header="MOTOR1" DataContext="{Binding Motors[0]}" Margin="0,0,0,15" Padding="10,5">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="ID:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                <TextBox Text="{Binding Id}" Width="60" Height="24" VerticalContentAlignment="Center"/>
+        <ItemsControl ItemsSource="{Binding Motors}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <GroupBox Header="{Binding Id, StringFormat=MOTOR{0}}" Margin="0,0,0,15" Padding="10,5">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="ID:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                            <TextBox Text="{Binding Id}" Width="60" Height="24" VerticalContentAlignment="Center"/>
 
-                <TextBlock Text="LED:" VerticalAlignment="Center" Margin="15,0,5,0"/>
-                <CheckBox IsChecked="{Binding IsLed}" VerticalAlignment="Center"/>
+                            <TextBlock Text="MODEL:" VerticalAlignment="Center" Margin="15,0,5,0"/>
+                            <TextBlock Text="{Binding ModelName}" Width="100" VerticalAlignment="Center" Foreground="Blue" FontWeight="Bold"/>
 
-                <TextBlock Text="ENABLE:" VerticalAlignment="Center" Margin="15,0,5,0"/>
-                <CheckBox IsChecked="{Binding IsEnable}" VerticalAlignment="Center"/>
+                            <TextBlock Text="LED:" VerticalAlignment="Center" Margin="15,0,5,0"/>
+                            <CheckBox IsChecked="{Binding IsLed}" VerticalAlignment="Center"/>
 
-                <ComboBox SelectedIndex="{Binding ModeIndex}" Width="140" Height="24" Margin="15,0,0,0" VerticalContentAlignment="Center">
-                    <ComboBoxItem Content="Current"/>
-                    <ComboBoxItem Content="Speed"/>
-                    <ComboBoxItem Content="Position"/>
-                    <ComboBoxItem Content="Extended Position"/>
-                </ComboBox>
+                            <TextBlock Text="ENABLE:" VerticalAlignment="Center" Margin="15,0,5,0"/>
+                            <CheckBox IsChecked="{Binding IsEnable}" VerticalAlignment="Center"/>
 
-                <TextBlock Text="A←" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                <Slider Width="180" VerticalAlignment="Center" Minimum="{Binding SliderMin}" Maximum="{Binding SliderMax}" Value="{Binding SliderValue}"/>
-                <TextBlock Text="→D" VerticalAlignment="Center" Margin="5,0,10,0"/>
-                <TextBlock Text="{Binding TargetValue}" Width="60" VerticalAlignment="Center"/>
-                <TextBlock Text="{Binding NowValue}" Width="60" VerticalAlignment="Center"/>
-            </StackPanel>
-        </GroupBox>
+                            <Button Command="{Binding RebootCommand}" Content="REBOOT" Padding="8,2" Margin="15,0,0,0" Background="#FFFFDDDD" Foreground="DarkRed" FontWeight="Bold"/>
+                            
+                            <ComboBox SelectedIndex="{Binding ModeIndex}" Width="140" Height="24" Margin="15,0,0,0" VerticalContentAlignment="Center">
+                                <ComboBoxItem Content="Current"/>
+                                <ComboBoxItem Content="Speed"/>
+                                <ComboBoxItem Content="Position"/>
+                                <ComboBoxItem Content="Extended Position"/>
+                            </ComboBox>
 
-        <GroupBox Header="MOTOR2" DataContext="{Binding Motors[1]}" Margin="0,0,0,15" Padding="10,5">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="ID:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                <TextBox Text="{Binding Id}" Width="60" Height="24" VerticalContentAlignment="Center"/>
-
-                <TextBlock Text="LED:" VerticalAlignment="Center" Margin="15,0,5,0"/>
-                <CheckBox IsChecked="{Binding IsLed}" VerticalAlignment="Center"/>
-
-                <TextBlock Text="ENABLE:" VerticalAlignment="Center" Margin="15,0,5,0"/>
-                <CheckBox IsChecked="{Binding IsEnable}" VerticalAlignment="Center"/>
-
-                <ComboBox SelectedIndex="{Binding ModeIndex}" Width="140" Height="24" Margin="15,0,0,0" VerticalContentAlignment="Center">
-                    <ComboBoxItem Content="Current"/>
-                    <ComboBoxItem Content="Speed"/>
-                    <ComboBoxItem Content="Position"/>
-                    <ComboBoxItem Content="Extended Position"/>
-                </ComboBox>
-
-                <TextBlock Text="A←" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                <Slider Width="180" VerticalAlignment="Center" Minimum="{Binding SliderMin}" Maximum="{Binding SliderMax}" Value="{Binding SliderValue}"/>
-                <TextBlock Text="→D" VerticalAlignment="Center" Margin="5,0,10,0"/>
-                <TextBlock Text="{Binding TargetValue}" Width="60" VerticalAlignment="Center"/>
-                <TextBlock Text="{Binding NowValue}" Width="60" VerticalAlignment="Center"/>
-            </StackPanel>
-        </GroupBox>
-
-        <GroupBox Header="MOTOR3" DataContext="{Binding Motors[2]}" Margin="0,0,0,15" Padding="10,5">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="ID:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                <TextBox Text="{Binding Id}" Width="60" Height="24" VerticalContentAlignment="Center"/>
-
-                <TextBlock Text="LED:" VerticalAlignment="Center" Margin="15,0,5,0"/>
-                <CheckBox IsChecked="{Binding IsLed}" VerticalAlignment="Center"/>
-
-                <TextBlock Text="ENABLE:" VerticalAlignment="Center" Margin="15,0,5,0"/>
-                <CheckBox IsChecked="{Binding IsEnable}" VerticalAlignment="Center"/>
-
-                <ComboBox SelectedIndex="{Binding ModeIndex}" Width="140" Height="24" Margin="15,0,0,0" VerticalContentAlignment="Center">
-                    <ComboBoxItem Content="Current"/>
-                    <ComboBoxItem Content="Speed"/>
-                    <ComboBoxItem Content="Position"/>
-                    <ComboBoxItem Content="Extended Position"/>
-                </ComboBox>
-
-                <TextBlock Text="A←" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                <Slider Width="180" VerticalAlignment="Center" Minimum="{Binding SliderMin}" Maximum="{Binding SliderMax}" Value="{Binding SliderValue}"/>
-                <TextBlock Text="→D" VerticalAlignment="Center" Margin="5,0,10,0"/>
-                <TextBlock Text="{Binding TargetValue}" Width="60" VerticalAlignment="Center"/>
-                <TextBlock Text="{Binding NowValue}" Width="60" VerticalAlignment="Center"/>
-            </StackPanel>
-        </GroupBox>
+                            <TextBlock Text="A←" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                            <Slider Width="180" VerticalAlignment="Center" Minimum="{Binding SliderMin}" Maximum="{Binding SliderMax}" Value="{Binding SliderValue}" PreviewMouseWheel="Slider_PreviewMouseWheel"/>
+                            <TextBlock Text="→D" VerticalAlignment="Center" Margin="5,0,10,0"/>
+                            <TextBlock Text="{Binding TargetValue}" Width="60" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding NowValue}" Width="60" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </GroupBox>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
 
 
         <GroupBox Header="SCRIPT RUNNER" Padding="10,8">
@@ -106,7 +66,32 @@
         </GroupBox>
 
         <GroupBox Header="GRAPH" Padding="10,8">
-            <ScottPlot:WpfPlot Name="WpfPlot1" Height="300"/>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <ItemsControl Grid.Row="0" ItemsSource="{Binding Motors}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,0,20,0">
+                                <CheckBox Content="{Binding Id, StringFormat=Motor{0}}" IsChecked="{Binding IsShowGraph}"/>
+                                <CheckBox Content="Current" IsEnabled="{Binding IsShowGraph}" IsChecked="{Binding IsShowCurrentGraph}"/>
+                                <CheckBox Content="Position" IsEnabled="{Binding IsShowGraph}" IsChecked="{Binding IsShowPositionGraph}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <ScottPlot:WpfPlot Grid.Row="1" Name="WpfPlot1" Height="300"/>
+            </Grid>
         </GroupBox>
 
     </StackPanel>

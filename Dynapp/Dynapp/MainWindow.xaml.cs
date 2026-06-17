@@ -17,6 +17,10 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized; // ★これを追加
+using System.Collections.Generic;
+using OpenTK.Platform.Windows;
 
 namespace Dynapp
 {
@@ -25,57 +29,189 @@ namespace Dynapp
     /// </summary>
     public partial class MainWindow : Window
     {
-        // グラフ用のロガー
-        private ScottPlot.Plottables.DataLogger[] _loggers = new ScottPlot.Plottables.DataLogger[3];
-
+        // ★ 配列をやめて「どのモーターが、どのロガーを持っているか」を紐づける辞書にする
+        private Dictionary<MotorViewModel, (ScottPlot.Plottables.DataLogger current, ScottPlot.Plottables.DataLogger pos)> _loggerMap = new();
+        // 色を順番に割り当てるためのパレットとカウンター
+        private ScottPlot.Palettes.Category20 _palette = new ScottPlot.Palettes.Category20();
+        private int _colorIndex = 0;
         // グラフ描画更新用のタイマー
         private DispatcherTimer _renderTimer;
-        public MainWindow()
+        // ★ 追加: ViewModelをクラス全体で共有できるように保持する変数
+        private MainViewModel _viewModel;
+        public MainWindow()//コンストラクタ
         {
             InitializeComponent();
-            var vm = new MainViewModel();
-            this.DataContext = vm;
+            _viewModel = new MainViewModel();
+            this.DataContext = _viewModel;
 
             // グラフの初期化
-            InitGraph();
+            InitGraphBase();
 
-            // ViewModelの「電流データ受信イベント」を購読（フック）する
-            vm.CurrentDataReceived += OnCurrentDataReceived;
+            // 1. 起動時に最初からあるモーターのグラフを作る
+            foreach (var motor in _viewModel.Motors)
+            {
+                AddMotorGraph(motor);
+            }
 
-            // グラフを定期的に再描画するタイマーの設定（約30FPS）
+            // 2. 「+1」や「-1」ボタンでモーターが増減した時のイベントを監視する！
+            _viewModel.Motors.CollectionChanged += (s, e) =>
+            {
+                // 増えた時
+                if (e.Action == NotifyCollectionChangedAction.Add && e.NewItems != null)
+                {
+                    foreach (MotorViewModel newMotor in e.NewItems)
+                        AddMotorGraph(newMotor);
+                }
+                // 減った時
+                else if (e.Action == NotifyCollectionChangedAction.Remove && e.OldItems != null)
+                {
+                    foreach (MotorViewModel oldMotor in e.OldItems)
+                        RemoveMotorGraph(oldMotor);
+                }
+                // ★ ここを追加！ Clear() でリセットされたらグラフの線も全部消す
+                else if (e.Action == NotifyCollectionChangedAction.Reset)
+                {
+                    foreach (var loggers in _loggerMap.Values)
+                    {
+                        WpfPlot1.Plot.Remove(loggers.current);
+                        WpfPlot1.Plot.Remove(loggers.pos);
+                    }
+                    _loggerMap.Clear();
+                    _colorIndex = 0; // 色の順番も最初に戻す
+                }
+
+                WpfPlot1.Refresh(); // グラフの凡例などを再描画
+            };
+            _viewModel.CurrentDataReceived += OnCurrentDataReceived;
+            _viewModel.PositionDataReceived += OnPositionDataReceived;
+
             _renderTimer = new DispatcherTimer();
             _renderTimer.Interval = TimeSpan.FromMilliseconds(33);
             _renderTimer.Tick += (s, e) => WpfPlot1.Refresh();
             _renderTimer.Start();
         }
-        private void InitGraph()
+        // グラフの「軸」などの土台だけを作る
+        private void InitGraphBase()
         {
             var plot = WpfPlot1.Plot;
-            plot.Title("Motor Current Monitor");
-            plot.YLabel("Current (mA)");
+            plot.Title("Motor Monitor");
 
-            ScottPlot.Color[] colors = { ScottPlot.Colors.Red, ScottPlot.Colors.Blue, ScottPlot.Colors.Green };
-            for (int i = 0; i < 3; i++)
-            {
-                _loggers[i] = plot.Add.DataLogger();
-                _loggers[i].Color = colors[i];
-                _loggers[i].LegendText = $"Motor {i + 1}";
+            plot.Axes.Left.Label.Text = "Current (mA)";
+            plot.Axes.Left.Label.ForeColor = ScottPlot.Colors.Blue;
+            plot.Axes.Left.TickLabelStyle.ForeColor = ScottPlot.Colors.Blue;
 
-                // 【オプション】最新の500データポイントだけ表示してスクロールさせる設定
-                _loggers[i].ManageAxisLimits = true;
-                _loggers[i].ViewSlide(500);
-            }
-
-            plot.ShowLegend(Alignment.UpperRight);
-            WpfPlot1.Refresh();
+            plot.Axes.Right.Label.Text = "Position";
+            plot.Axes.Right.Label.ForeColor = ScottPlot.Colors.Red;
+            plot.Axes.Right.TickLabelStyle.ForeColor = ScottPlot.Colors.Red;
+            WpfPlot1.Plot.ShowLegend(Alignment.UpperLeft);
         }
-        // ViewModelから裏方スレッドで呼ばれるメソッド
-        private void OnCurrentDataReceived(double c1, double c2, double c3)
+        // ★ 新しいモーターのグラフ線をScottPlotに追加するメソッド
+        private void AddMotorGraph(MotorViewModel motor)
         {
-            // DataLoggerへの追加は別スレッドからでも安全に行えます
-            _loggers[0].Add(c1);
-            _loggers[1].Add(c2);
-            _loggers[2].Add(c3);
+            var plot = WpfPlot1.Plot;
+
+            // Current用ロガー
+            var cLogger = plot.Add.DataLogger();
+            cLogger.Axes.YAxis = plot.Axes.Left;
+            cLogger.Color = _palette.GetColor(_colorIndex * 2);
+            cLogger.LegendText = $"Motor {motor.Id} Current";
+            cLogger.ManageAxisLimits = true;
+            cLogger.ViewSlide(500);
+            cLogger.IsVisible = motor.IsShowCurrentGraph;
+
+            // Position用ロガー
+            var pLogger = plot.Add.DataLogger();
+            pLogger.Axes.YAxis = plot.Axes.Right;
+            pLogger.Color = _palette.GetColor(_colorIndex * 2 + 1);
+            pLogger.LegendText = $"Motor {motor.Id} Position";
+            pLogger.ManageAxisLimits = true;
+            pLogger.ViewSlide(500);
+            pLogger.IsVisible = motor.IsShowPositionGraph;
+
+            // 辞書に登録
+            _loggerMap.Add(motor, (cLogger, pLogger));
+            _colorIndex++;
+
+            // チェックボックスの変更監視
+            motor.PropertyChanged += (sender, e) =>
+            {
+                if (e.PropertyName == nameof(MotorViewModel.IsShowCurrentGraph))
+                    cLogger.IsVisible = motor.IsShowCurrentGraph;
+                else if (e.PropertyName == nameof(MotorViewModel.IsShowPositionGraph))
+                    pLogger.IsVisible = motor.IsShowPositionGraph;
+            };
+        }
+
+        // ★ モーターが減った時にグラフ線をScottPlotから削除するメソッド
+        private void RemoveMotorGraph(MotorViewModel motor)
+        {
+            if (_loggerMap.TryGetValue(motor, out var loggers))
+            {
+                // Plotから線を消す
+                WpfPlot1.Plot.Remove(loggers.current);
+                WpfPlot1.Plot.Remove(loggers.pos);
+
+                // 辞書からも削除
+                _loggerMap.Remove(motor);
+            }
+        }
+        // データ受信時
+        private void OnCurrentDataReceived(double[] currents)
+        {
+            for (int i = 0; i < currents.Length; i++)
+            {
+                // インデックスが存在し、かつ辞書に登録されているモーターならデータを追加
+                if (i < _viewModel.Motors.Count)
+                {
+                    var motor = _viewModel.Motors[i];
+                    if (_loggerMap.ContainsKey(motor))
+                    {
+                        _loggerMap[motor].current.Add(currents[i]);
+                    }
+                }
+            }
+        }
+
+        private void OnPositionDataReceived(int[] positions)
+        {
+            for (int i = 0; i < positions.Length; i++)
+            {
+                if (i < _viewModel.Motors.Count)
+                {
+                    var motor = _viewModel.Motors[i];
+                    if (_loggerMap.ContainsKey(motor))
+                    {
+                        _loggerMap[motor].pos.Add(positions[i]);
+                    }
+                }
+            }
+        }
+
+        // --- MainWindow.xaml.cs の中に追加 ---
+
+        private void Slider_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            // イベントの発生元がSliderかどうかを確認
+            if (sender is Slider slider)
+            {
+                // 1回のホイールカチッで動かす量（お好みで変更してください）
+                double step = 50;
+
+                // e.Delta は奥に回すとプラス（通常+120）、手前に回すとマイナス（通常-120）になります
+                if (e.Delta > 0)
+                {
+                    // 上限を超えないように足す
+                    slider.Value = Math.Min(slider.Maximum, slider.Value + step);
+                }
+                else if (e.Delta < 0)
+                {
+                    // 下限を下回らないように引く
+                    slider.Value = Math.Max(slider.Minimum, slider.Value - step);
+                }
+
+                // これをtrueにすると、「画面全体がスクロールしてしまう」のを防げます
+                e.Handled = true;
+            }
         }
     }
 
@@ -87,17 +223,16 @@ namespace Dynapp
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
         private readonly DynamixelModel _dynamixelModel = new DynamixelModel();
-        public MotorViewModel[] Motors { get; }
+        public ObservableCollection<MotorViewModel> Motors { get; } = new ObservableCollection<MotorViewModel>();
+
+        public int MotorCount => Motors.Count;
+
+        public event Action<double[]>? CurrentDataReceived;
+        public event Action<int[]>? PositionDataReceived;
 
         public MainViewModel()// コンストラクタ
         {
             RefreshPorts(); // 利用可能なCOMポートを最初に取得しておく
-            Motors = new MotorViewModel[]
-            {
-                new MotorViewModel(1, _dynamixelModel),
-                new MotorViewModel(2, _dynamixelModel),
-                new MotorViewModel(3, _dynamixelModel)
-            };
         }
 
 
@@ -114,7 +249,6 @@ namespace Dynapp
         // ループを回し続けるかどうかのフラグ
         private bool _IsPolling = false;
 
-        public event Action<double, double, double>? CurrentDataReceived;
 
         /// <summary>
         /// 裏側でモーターの情報を定期的に取得し続ける非同期メソッド
@@ -122,39 +256,52 @@ namespace Dynapp
         private async void StartPolling()
         {
             _IsPolling = true;
-
-            byte[] targetIds = Motors.Select(m => m.MotorId).ToArray();
-
             // Task.Run で裏方のスレッド（別作業員）にループ処理を丸投げする
             await Task.Run(async () =>
             {
                 while (_IsPolling)
                 {
+                    byte[] targetIds = Motors.Select(m => m.MotorId).ToArray();
                     var positions = _dynamixelModel.ReadAllPositions(targetIds);
                     if(positions != null)
                     {
-                        foreach(var motor in Motors) 
+                        int[] pArray = new int[Motors.Count];
+                        for(int i = 0; i < Motors.Count; i++)
                         {
-                            if(positions.ContainsKey(motor.MotorId))
+                            byte id = Motors[i].MotorId;
+                            if (positions.ContainsKey(id))
                             {
-                                motor.NowValue = positions[motor.MotorId];
+                                Motors[i].NowValue = positions[id];
+                                pArray[i] = positions[id];
                             }
                         }
+                        PositionDataReceived?.Invoke(pArray);
                     }
+
                     // --- 【追加】電流値の取得と通知 ---
                     // ※ DynamixelModelに電流を取得するメソッド (ReadAllCurrents等) を実装する必要があります
                     var currents = _dynamixelModel.ReadAllCurrents(targetIds);
                     if (currents != null)
                     {
-                        double c1 = currents.ContainsKey(1) ? currents[1] : 0;
-                        double c2 = currents.ContainsKey(2) ? currents[2] : 0;
-                        double c3 = currents.ContainsKey(3) ? currents[3] : 0;
+                        double[] cArray = new double[Motors.Count];
+                        for (int i = 0; i < Motors.Count; i++)
+                        {
+                            byte id = Motors[i].MotorId;
 
-                        // View側に「最新の電流値が取れたよ」と通知する
-                        CurrentDataReceived?.Invoke(c1, c2, c3);
+                            // ⭕ モーターごとのCurrentScale（2.69 または 1.0）を掛け算する
+                            if (currents.ContainsKey(id))
+                            {
+                                cArray[i] = currents[id] * Motors[i].CurrentScale;
+                            }
+                            else
+                            {
+                                cArray[i] = 0;
+                            }
+                        }
+                        // 配列ごと通知
+                        CurrentDataReceived?.Invoke(cArray);
                     }
                     // 3. 少し休む（50ミリ秒待機 = 1秒間に20回更新）
-                    // ※これを入れないと全力で通信してエラーになるので必須です
                     await Task.Delay(50);
                 }
             });
@@ -288,11 +435,11 @@ namespace Dynapp
                     bool isRelative = commandStr.StartsWith("+") || commandStr.StartsWith("-");
                     if (!int.TryParse(commandStr, out int value)) continue;
 
-                    int[] targetValues = new int[Motors.Length];
-                    bool[] isTarget = new bool[Motors.Length];
+                    int[] targetValues = new int[Motors.Count];
+                    bool[] isTarget = new bool[Motors.Count];
 
                     // JSの mask & (1 << index) と全く同じロジック！
-                    for (int i = 0; i < Motors.Length; i++)
+                    for (int i = 0; i < Motors.Count; i++)
                     {
                         if ((mask & (1 << i)) != 0)
                         {
@@ -316,7 +463,7 @@ namespace Dynapp
                     while (_IsScriptRunning)
                     {
                         bool allReached = true;
-                        for (int i = 0; i < Motors.Length; i++)
+                        for (int i = 0; i < Motors.Count; i++)
                         {
                             if (isTarget[i])
                             {
@@ -358,6 +505,53 @@ namespace Dynapp
                 motor.IsEnable = false;
             }
             ConnectionStatus = "緊急停止しました(トルクOFF)";
+        }
+
+        public DelegateCommand MotorCountMinusCommand => new DelegateCommand(MotorCountMinus);
+        private void MotorCountMinus()
+        {
+            if(Motors.Count > 1)
+            {
+                Motors.RemoveAt(Motors.Count - 1);
+                NotifyPropertyChanged(nameof(MotorCount));
+            }
+        }
+        public DelegateCommand MotorCountPlusCommand => new DelegateCommand(MotorCountPlus);
+        private void MotorCountPlus()
+        {
+            byte newId = (byte)(Motors.Count + 1);
+            Motors.Add(new MotorViewModel(newId, _dynamixelModel));
+            NotifyPropertyChanged(nameof(MotorCount));
+        }
+        public DelegateCommand ScanCommand => new DelegateCommand(Scan);
+
+        private async void Scan()
+        {
+            // USBが繋がっていない場合は弾く
+            if (ConnectionStatus == "未接続" || ConnectionStatus.Contains("失敗") || ConnectionStatus.Contains("選ばれて"))
+            {
+                ConnectionStatus = "先にUSB接続してください";
+                return;
+            }
+
+            ConnectionStatus = "モーターをスキャン中...";
+
+            // スキャン処理は時間がかかる（数秒）ので、UIをフリーズさせないよう裏方スレッドで実行
+            var detectedList = await Task.Run(() => _dynamixelModel.ScanMotors());
+
+            // 既存のリストを一旦クリア
+            Motors.Clear();
+
+            // 発見したモーターを自動追加
+            foreach (var info in detectedList)
+            {
+                var newMotor = new MotorViewModel(info.Id, _dynamixelModel);
+                newMotor.ModelNumber = (ushort)info.ModelNumber; // ★ XMかXCかも自動判別してセット！
+                Motors.Add(newMotor);
+            }
+
+            NotifyPropertyChanged(nameof(MotorCount));
+            ConnectionStatus = $"スキャン完了: {Motors.Count}個のモーターを発見";
         }
     }
 }

@@ -182,13 +182,60 @@ namespace Dynapp
                         short currentRaw = (short)rawData;
 
                         // 生データ(RAW)を実際の電流単位(mA)に変換
-                        // ※ XM430やXC430などのXシリーズは 1単位 = 2.69mA です
-                        double currentmA = currentRaw * 2.69;
+                        // ※ XC330は 1単位 = 1.0mA なのでそのまま使う
+                        double currentmA = currentRaw;
 
                         results[id] = currentmA;
                     }
                 }
                 return results;
+            }
+        }
+        // --- DynamixelModel.cs 内に追加 ---
+
+        /// <summary>
+        /// 接続されているモーターをスキャンし、発見した(ID, シリーズインデックス)のリストを返す
+        /// </summary>
+        public List<(byte Id, int ModelNumber)> ScanMotors()
+        {
+            var detectedMotors = new List<(byte, int)>();
+            if (_portNum == -1) return detectedMotors;
+
+            lock (_lockObj)
+            {
+                // 探索するIDの範囲（通常は1〜20程度。増やすとスキャンに時間がかかります）
+                for (byte id = 1; id <= 10; id++)
+                {
+                    // Pingを打ってモデル番号を取得
+                    ushort modelNumber = Dynamixel.pingGetModelNum(_portNum, PROTOCOL_VERSION, id);
+
+                    // 通信が成功したか（モーターが存在したか）を確認
+                    int dxlCommResult = Dynamixel.getLastTxRxResult(_portNum, PROTOCOL_VERSION);
+
+                    if (dxlCommResult == 0) // 0 は COMM_SUCCESS
+                    {
+                        detectedMotors.Add((id, modelNumber));
+                        System.Diagnostics.Debug.WriteLine($"Found Motor! ID: {id}, Model: {modelNumber}");
+                    }
+                }
+            }
+            return detectedMotors;
+        }
+
+        // --- DynamixelModel.cs の中（他のメソッドの並び）に追加 ---
+
+        /// <summary>
+        /// 指定したIDのモーターを再起動（リブート）する
+        /// エラー状態（赤点滅など）からの復帰に使用
+        /// </summary>
+        public void Reboot(byte motorId)
+        {
+            if (_portNum == -1) return; // 未接続なら何もしない
+
+            lock (_lockObj)
+            {
+                // Dynamixel SDKに用意されているリブート専用関数を呼び出す
+                Dynamixel.reboot(_portNum, PROTOCOL_VERSION, motorId);
             }
         }
     }
