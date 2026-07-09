@@ -168,6 +168,53 @@ namespace Dynapp
             _PositionDGain = d; NotifyPropertyChanged(nameof(PositionDGain));
         }
 
+        // --- 作動機構テスト(速度制御)用 ---
+
+        // このモーターを速度連動の対象にするか
+        private bool _IsLinked;
+        public bool IsLinked
+        {
+            get => _IsLinked;
+            set
+            {
+                if (_IsLinked != value)
+                {
+                    _IsLinked = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+
+        // 回転方向を反転させるか（連動グループ内で他のモーターと逆回転させたいとき）
+        private bool _IsReversed;
+        public bool IsReversed
+        {
+            get => _IsReversed;
+            set
+            {
+                if (_IsReversed != value)
+                {
+                    _IsReversed = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+
+        // 現在このモーターに出している目標速度（表示用）
+        private int _GoalVelocity = 0;
+        public int GoalVelocity
+        {
+            get => _GoalVelocity;
+            set
+            {
+                if (_GoalVelocity != value)
+                {
+                    _GoalVelocity = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+
         private int _ModeIndex = 3;
         public int ModeIndex
         {

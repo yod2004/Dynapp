@@ -11,7 +11,15 @@ namespace Dynapp
         private const int ADDR_TORQUE_ENABLE = 64; // 現在位置のアドレス
         private const int ADDR_X_LED = 65;
         private const int PROTOCOL_VERSION = 2;
+        private const int ADDR_OPERATING_MODE = 11; // 動作モード (1byte) ※トルクOFF時のみ変更可
+        private const int ADDR_GOAL_VELOCITY = 104;  // Goal Velocity (4byte, 符号付き)
         private const int ADDR_GOAL_POSITION = 116;
+
+        // 動作モードの値 (Dynamixel Protocol 2.0 / Xシリーズ)
+        public const byte OP_MODE_CURRENT = 0;
+        public const byte OP_MODE_VELOCITY = 1;
+        public const byte OP_MODE_POSITION = 3;
+        public const byte OP_MODE_EXT_POSITION = 4;
         private const int ADDR_POSITION_D_GAIN = 80; // Position D Gain (2byte)
         private const int ADDR_POSITION_I_GAIN = 82; // Position I Gain (2byte)
         private const int ADDR_POSITION_P_GAIN = 84; // Position P Gain (2byte)
@@ -95,6 +103,37 @@ namespace Dynapp
             lock (_lockObj)
             {
                 Dynamixel.write4ByteTxRx(_portNum, PROTOCOL_VERSION, motorId, ADDR_GOAL_POSITION, (uint)target);
+            }
+        }
+
+        /// <summary>
+        /// 現在接続されているか
+        /// </summary>
+        public bool IsConnected => _portNum != -1;
+
+        /// <summary>
+        /// 動作モード(位置/速度/電流など)を切り替える。
+        /// ※ Dynamixelの仕様上、動作モードはトルクOFFのときしか書き換えられないので注意。
+        /// </summary>
+        public void SetOperatingMode(byte motorId, byte mode)
+        {
+            if (_portNum == -1) return; // 未接続なら何もしない
+            lock (_lockObj)
+            {
+                Dynamixel.write1ByteTxRx(_portNum, PROTOCOL_VERSION, motorId, ADDR_OPERATING_MODE, mode);
+            }
+        }
+
+        /// <summary>
+        /// 速度制御モード用のGoal Velocity(目標速度)を書き込む。
+        /// 単位は約0.229 rev/min。符号(±)で回転方向が決まる。
+        /// </summary>
+        public void SetGoalVelocity(byte motorId, int velocity)
+        {
+            if (_portNum == -1) return; // 未接続なら何もしない
+            lock (_lockObj)
+            {
+                Dynamixel.write4ByteTxRx(_portNum, PROTOCOL_VERSION, motorId, ADDR_GOAL_VELOCITY, (uint)velocity);
             }
         }
 

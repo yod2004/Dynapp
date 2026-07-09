@@ -155,6 +155,78 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
+            <!-- ===== 作動機構テスト (速度制御) ===== -->
+            <Border Style="{StaticResource Card}" Margin="0,4,0,14">
+                <StackPanel>
+                    <TextBlock Text="VELOCITY — 作動機構テスト" Style="{StaticResource CardTitle}"/>
+
+                    <!-- 連動させるモーターと回転方向を選ぶ -->
+                    <ItemsControl ItemsSource="{Binding Motors}" Margin="0,0,0,10">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{StaticResource ControlBgBrush}" CornerRadius="8"
+                                        Padding="12,8" Margin="0,0,10,10">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Id, StringFormat=Motor {0}}"
+                                                   FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                        <CheckBox Content="連動" IsChecked="{Binding IsLinked}" Margin="0,0,0,4"/>
+                                        <CheckBox Content="逆転" IsChecked="{Binding IsReversed}"
+                                                  IsEnabled="{Binding IsLinked}"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                            <TextBlock Text="指令速度:" Style="{StaticResource FieldLabel}"
+                                                       Margin="0,0,6,0"/>
+                                            <TextBlock Text="{Binding GoalVelocity}" FontWeight="Bold"
+                                                       Foreground="{StaticResource AccentBrush}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- 速度スライダー(マウスホイールで微調整) -->
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="SPEED" Style="{StaticResource FieldLabel}"
+                                   Margin="0,0,12,0"/>
+                        <TextBlock Grid.Column="1" Text="逆 ←" Style="{StaticResource FieldLabel}"
+                                   Margin="0,0,10,0"/>
+                        <Slider Grid.Column="2" VerticalAlignment="Center"
+                                Minimum="-1023" Maximum="1023"
+                                Value="{Binding LinkedSpeed}"
+                                PreviewMouseWheel="SpeedSlider_PreviewMouseWheel"/>
+                        <TextBlock Grid.Column="3" Text="→ 正" Style="{StaticResource FieldLabel}"
+                                   Margin="10,0,16,0"/>
+                        <StackPanel Grid.Column="4" Margin="0,0,16,0" VerticalAlignment="Center">
+                            <TextBlock Text="VALUE" FontSize="9" Foreground="{StaticResource TextDimBrush}"/>
+                            <TextBlock Text="{Binding LinkedSpeed}" FontWeight="Bold" MinWidth="50"
+                                       Foreground="{StaticResource AccentBrush}"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Command="{Binding StartVelocityTestCommand}" Content="▶ START"
+                                Style="{StaticResource AccentButton}" Padding="18,7"/>
+                        <Button Command="{Binding StopVelocityTestCommand}" Content="■ STOP"
+                                Style="{StaticResource DangerButton}" Padding="18,7" Margin="8,0,0,0"/>
+                        <TextBlock Text="ヒント: スライダーの上でマウスホイールを回すと回転速度を微調整できます"
+                                   Style="{StaticResource FieldLabel}" Margin="18,0,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
             <!-- ===== スクリプトランナー ===== -->
             <Border Style="{StaticResource Card}" Margin="0,4,0,14">
                 <StackPanel>

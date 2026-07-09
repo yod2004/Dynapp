@@ -223,6 +223,23 @@ namespace Dynapp
                 e.Handled = true;
             }
         }
+
+        // 作動機構テスト用: マウスホイールで回転速度(LinkedSpeed)を微調整する
+        private void SpeedSlider_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (sender is Slider slider)
+            {
+                // 1カチッあたりの速度変化量。細かく調整したいので小さめにしてある
+                double step = 10;
+
+                if (e.Delta > 0)
+                    slider.Value = Math.Min(slider.Maximum, slider.Value + step);
+                else if (e.Delta < 0)
+                    slider.Value = Math.Max(slider.Minimum, slider.Value - step);
+
+                e.Handled = true; // 画面全体のスクロールを止める
+            }
+        }
     }
 
         public class MainViewModel : INotifyPropertyChanged
@@ -315,6 +332,130 @@ namespace Dynapp
             {
                motor.IsEnable = true;
             }
+        }
+
+        // ===== 作動機構テスト (速度制御) =====
+
+        // 速度連動テストが実行中かどうか
+        private bool _IsVelocityTestRunning = false;
+        public bool IsVelocityTestRunning
+        {
+            get => _IsVelocityTestRunning;
+            private set
+            {
+                _IsVelocityTestRunning = value;
+                NotifyPropertyChanged();
+            }
+        }
+
+        // マウスホイール等で調整する共通の目標速度(符号付き)。
+        // 実際に各モーターへ出す値は、逆転チェックの有無でこの値を反転して決める。
+        private int _LinkedSpeed = 0;
+        public int LinkedSpeed
+        {
+            get => _LinkedSpeed;
+            set
+            {
+                // Dynamixelの速度指令の一般的な範囲に収める
+                int clamped = Math.Max(-1023, Math.Min(1023, value));
+                if (_LinkedSpeed != clamped)
+                {
+                    _LinkedSpeed = clamped;
+                    NotifyPropertyChanged();
+                    // テスト実行中なら、速度を変えた瞬間に連動モーターへ反映する
+                    if (IsVelocityTestRunning) ApplyAllVelocities();
+                }
+            }
+        }
+
+        // 新しく追加したモーターの「連動」「逆転」変更を監視して、実行中なら即反映する
+        private void AttachMotor(MotorViewModel motor)
+        {
+            motor.PropertyChanged += (s, e) =>
+            {
+                if (!IsVelocityTestRunning) return;
+                if (e.PropertyName == nameof(MotorViewModel.IsReversed) ||
+                    e.PropertyName == nameof(MotorViewModel.IsLinked))
+                {
+                    ApplyMotorVelocity(motor);
+                }
+            };
+        }
+
+        // 1台分の目標速度を計算して送る。連動対象でない/停止中なら0(停止)を送る。
+        private void ApplyMotorVelocity(MotorViewModel motor)
+        {
+            int v = 0;
+            if (IsVelocityTestRunning && motor.IsLinked)
+            {
+                v = motor.IsReversed ? -LinkedSpeed : LinkedSpeed;
+            }
+            motor.GoalVelocity = v; // 表示用
+            byte id = motor.MotorId;
+            Task.Run(() => _dynamixelModel.SetGoalVelocity(id, v));
+        }
+
+        // 連動対象すべてに現在の速度を反映する
+        private void ApplyAllVelocities()
+        {
+            foreach (var motor in Motors)
+            {
+                ApplyMotorVelocity(motor);
+            }
+        }
+
+        public DelegateCommand StartVelocityTestCommand => new DelegateCommand(StartVelocityTest);
+        private void StartVelocityTest()
+        {
+            if (!_dynamixelModel.IsConnected)
+            {
+                ConnectionStatus = "先にUSB接続してください";
+                return;
+            }
+
+            var linked = Motors.Where(m => m.IsLinked).ToList();
+            if (linked.Count == 0)
+            {
+                ConnectionStatus = "連動させるモーターを1台以上選んでください";
+                return;
+            }
+
+            ConnectionStatus = "作動機構テスト: 速度モードへ切替中...";
+
+            Task.Run(() =>
+            {
+                // 動作モードはトルクOFFのときしか書き換えられないので、順番を守る
+                foreach (var motor in linked)
+                {
+                    byte id = motor.MotorId;
+                    _dynamixelModel.SetTorqueEnable(id, false);
+                    _dynamixelModel.SetOperatingMode(id, DynamixelModel.OP_MODE_VELOCITY);
+                    _dynamixelModel.SetTorqueEnable(id, true);
+                }
+
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    // 画面のENABLEチェックも連動して入れておく
+                    foreach (var motor in linked) motor.IsEnable = true;
+                    IsVelocityTestRunning = true;
+                    ApplyAllVelocities();
+                    ConnectionStatus = $"作動機構テスト実行中 ({linked.Count}台連動)";
+                });
+            });
+        }
+
+        public DelegateCommand StopVelocityTestCommand => new DelegateCommand(StopVelocityTest);
+        private void StopVelocityTest()
+        {
+            IsVelocityTestRunning = false;
+            // 連動対象を止める(トルクは入れたまま速度0で停止させる)
+            foreach (var motor in Motors)
+            {
+                motor.GoalVelocity = 0;
+                byte id = motor.MotorId;
+                Task.Run(() => _dynamixelModel.SetGoalVelocity(id, 0));
+            }
+            ConnectionStatus = "作動機構テスト停止 (速度0)";
         }
 
         public DelegateCommand UsbConnectCommand => new DelegateCommand(UsbConnect);
@@ -521,7 +662,9 @@ namespace Dynapp
         private void MotorCountPlus()
         {
             byte newId = (byte)(Motors.Count + 1);
-            Motors.Add(new MotorViewModel(newId, _dynamixelModel));
+            var newMotor = new MotorViewModel(newId, _dynamixelModel);
+            AttachMotor(newMotor);
+            Motors.Add(newMotor);
             NotifyPropertyChanged(nameof(MotorCount));
         }
         public DelegateCommand ScanCommand => new DelegateCommand(Scan);
@@ -548,6 +691,7 @@ namespace Dynapp
             {
                 var newMotor = new MotorViewModel(info.Id, _dynamixelModel);
                 newMotor.ModelNumber = (ushort)info.ModelNumber; // ★ XMかXCかも自動判別してセット！
+                AttachMotor(newMotor);
                 Motors.Add(newMotor);
             }
 
