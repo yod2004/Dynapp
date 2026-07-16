@@ -185,21 +185,6 @@ namespace Dynapp
             }
         }
 
-        // 回転方向を反転させるか（連動グループ内で他のモーターと逆回転させたいとき）
-        private bool _IsReversed;
-        public bool IsReversed
-        {
-            get => _IsReversed;
-            set
-            {
-                if (_IsReversed != value)
-                {
-                    _IsReversed = value;
-                    NotifyPropertyChanged();
-                }
-            }
-        }
-
         // 現在このモーターに出している目標速度（表示用）
         private int _GoalVelocity = 0;
         public int GoalVelocity

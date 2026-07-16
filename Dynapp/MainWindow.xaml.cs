@@ -240,6 +240,22 @@ namespace Dynapp
                 e.Handled = true; // 画面全体のスクロールを止める
             }
         }
+
+        // 作動機構テスト用: マウスホイールで連動比(LinkRatio, -1〜1)を微調整する
+        private void RatioSlider_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (sender is Slider slider)
+            {
+                double step = 0.05;
+
+                if (e.Delta > 0)
+                    slider.Value = Math.Min(slider.Maximum, slider.Value + step);
+                else if (e.Delta < 0)
+                    slider.Value = Math.Max(slider.Minimum, slider.Value - step);
+
+                e.Handled = true;
+            }
+        }
     }
 
         public class MainViewModel : INotifyPropertyChanged
@@ -303,6 +319,8 @@ namespace Dynapp
                             }
                         }
                         PositionDataReceived?.Invoke(pArray);
+                        // 連動対象2台の位置差分を更新する
+                        UpdateLinkedPositionDiff();
                     }
 
                     // --- 【追加】電流値の取得と通知 ---
@@ -348,19 +366,18 @@ namespace Dynapp
             }
         }
 
-        // マウスホイール等で調整する共通の目標速度(符号付き)。
-        // 実際に各モーターへ出す値は、逆転チェックの有無でこの値を反転して決める。
-        private int _LinkedSpeed = 0;
-        public int LinkedSpeed
+        // 1台目のモーターの目標速度(符号付き)。スライダー/マウスホイールで調整する。
+        private int _Motor1Speed = 0;
+        public int Motor1Speed
         {
-            get => _LinkedSpeed;
+            get => _Motor1Speed;
             set
             {
                 // Dynamixelの速度指令の一般的な範囲に収める
                 int clamped = Math.Max(-1023, Math.Min(1023, value));
-                if (_LinkedSpeed != clamped)
+                if (_Motor1Speed != clamped)
                 {
-                    _LinkedSpeed = clamped;
+                    _Motor1Speed = clamped;
                     NotifyPropertyChanged();
                     // テスト実行中なら、速度を変えた瞬間に連動モーターへ反映する
                     if (IsVelocityTestRunning) ApplyAllVelocities();
@@ -368,39 +385,97 @@ namespace Dynapp
             }
         }
 
-        // 新しく追加したモーターの「連動」「逆転」変更を監視して、実行中なら即反映する
+        // 1台目と2台目の連動比(-1〜1)。
+        // 2台目の速度 = 1台目の速度 × この比。 -1で逆回転、0で停止、1で同回転。
+        private double _LinkRatio = 1.0;
+        public double LinkRatio
+        {
+            get => _LinkRatio;
+            set
+            {
+                double clamped = Math.Max(-1.0, Math.Min(1.0, value));
+                if (_LinkRatio != clamped)
+                {
+                    _LinkRatio = clamped;
+                    NotifyPropertyChanged();
+                    // テスト実行中なら、比を変えた瞬間に2台目へ反映する
+                    if (IsVelocityTestRunning) ApplyAllVelocities();
+                }
+            }
+        }
+
+        // 連動対象(先頭2台)の現在位置の差分(1台目 - 2台目)。表示用。
+        private int _LinkedPositionDiff = 0;
+        public int LinkedPositionDiff
+        {
+            get => _LinkedPositionDiff;
+            private set
+            {
+                if (_LinkedPositionDiff != value)
+                {
+                    _LinkedPositionDiff = value;
+                    NotifyPropertyChanged();
+                    NotifyPropertyChanged(nameof(LinkedPositionDiffDeg));
+                }
+            }
+        }
+
+        // 上記の差分を度数法(°)に換算した値。差分を2で割ってから4096カウント = 360°で換算する。
+        public double LinkedPositionDiffDeg => _LinkedPositionDiff / 2.0 / 4096.0 * 360.0;
+
+        // ゼロ点ボタンで記録する基準差分。表示はこの値からの相対差分になる。
+        private int _LinkedPositionDiffOffset = 0;
+
+        // 連動対象2台の生の位置差分(1台目 - 2台目)。ゼロ点計算のため保持する。
+        private int _RawLinkedPositionDiff = 0;
+
+        // 連動対象(先頭2台)の現在位置の差分を計算して表示用プロパティに反映する。
+        private void UpdateLinkedPositionDiff()
+        {
+            var linked = Motors.Where(m => m.IsLinked).Take(2).ToList();
+            _RawLinkedPositionDiff = linked.Count >= 2 ? linked[0].NowValue - linked[1].NowValue : 0;
+            // 記録した基準(オフセット)を引いて、ゼロ点からの相対差分として表示する
+            LinkedPositionDiff = _RawLinkedPositionDiff - _LinkedPositionDiffOffset;
+        }
+
+        // 現在の差分をゼロ点(0度)として記録するコマンド
+        public DelegateCommand ZeroLinkedPositionDiffCommand => new DelegateCommand(ZeroLinkedPositionDiff);
+        private void ZeroLinkedPositionDiff()
+        {
+            _LinkedPositionDiffOffset = _RawLinkedPositionDiff;
+            // 表示を即座に更新(ポーリングを待たずに0になる)
+            LinkedPositionDiff = 0;
+        }
+
+        // 新しく追加したモーターの「連動」変更を監視して、実行中なら即反映する
         private void AttachMotor(MotorViewModel motor)
         {
             motor.PropertyChanged += (s, e) =>
             {
                 if (!IsVelocityTestRunning) return;
-                if (e.PropertyName == nameof(MotorViewModel.IsReversed) ||
-                    e.PropertyName == nameof(MotorViewModel.IsLinked))
-                {
-                    ApplyMotorVelocity(motor);
-                }
+                if (e.PropertyName == nameof(MotorViewModel.IsLinked))
+                    ApplyAllVelocities();
             };
         }
 
-        // 1台分の目標速度を計算して送る。連動対象でない/停止中なら0(停止)を送る。
-        private void ApplyMotorVelocity(MotorViewModel motor)
-        {
-            int v = 0;
-            if (IsVelocityTestRunning && motor.IsLinked)
-            {
-                v = motor.IsReversed ? -LinkedSpeed : LinkedSpeed;
-            }
-            motor.GoalVelocity = v; // 表示用
-            byte id = motor.MotorId;
-            Task.Run(() => _dynamixelModel.SetGoalVelocity(id, v));
-        }
-
-        // 連動対象すべてに現在の速度を反映する
+        // 連動対象(先頭から2台)に速度を割り当てる。
+        // 1台目 = Motor1Speed、2台目 = Motor1Speed × 連動比。それ以外は0(停止)。
         private void ApplyAllVelocities()
         {
+            var linked = Motors.Where(m => m.IsLinked).Take(2).ToList();
             foreach (var motor in Motors)
             {
-                ApplyMotorVelocity(motor);
+                int v = 0;
+                if (IsVelocityTestRunning)
+                {
+                    if (linked.Count > 0 && motor == linked[0])
+                        v = Motor1Speed;
+                    else if (linked.Count > 1 && motor == linked[1])
+                        v = (int)Math.Round(Motor1Speed * LinkRatio);
+                }
+                motor.GoalVelocity = v; // 表示用
+                byte id = motor.MotorId;
+                Task.Run(() => _dynamixelModel.SetGoalVelocity(id, v));
             }
         }
 
@@ -413,10 +488,10 @@ namespace Dynapp
                 return;
             }
 
-            var linked = Motors.Where(m => m.IsLinked).ToList();
+            var linked = Motors.Where(m => m.IsLinked).Take(2).ToList();
             if (linked.Count == 0)
             {
-                ConnectionStatus = "連動させるモーターを1台以上選んでください";
+                ConnectionStatus = "連動させるモーターを選んでください(先頭2台が対象)";
                 return;
             }
 

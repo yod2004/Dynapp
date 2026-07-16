@@ -174,9 +174,7 @@
                                     <StackPanel>
                                         <TextBlock Text="{Binding Id, StringFormat=Motor {0}}"
                                                    FontWeight="SemiBold" Margin="0,0,0,6"/>
-                                        <CheckBox Content="連動" IsChecked="{Binding IsLinked}" Margin="0,0,0,4"/>
-                                        <CheckBox Content="逆転" IsChecked="{Binding IsReversed}"
-                                                  IsEnabled="{Binding IsLinked}"/>
+                                        <CheckBox Content="連動" IsChecked="{Binding IsLinked}"/>
                                         <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
                                             <TextBlock Text="指令速度:" Style="{StaticResource FieldLabel}"
                                                        Margin="0,0,6,0"/>
@@ -189,40 +187,90 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <!-- 速度スライダー(マウスホイールで微調整) -->
+                    <!-- ①1台目の速度スライダー(マウスホイールで微調整) -->
                     <Grid Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="110"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="SPEED" Style="{StaticResource FieldLabel}"
+                        <TextBlock Grid.Column="0" Text="① M1 速度" Style="{StaticResource FieldLabel}"
                                    Margin="0,0,12,0"/>
                         <TextBlock Grid.Column="1" Text="逆 ←" Style="{StaticResource FieldLabel}"
                                    Margin="0,0,10,0"/>
                         <Slider Grid.Column="2" VerticalAlignment="Center"
                                 Minimum="-1023" Maximum="1023"
-                                Value="{Binding LinkedSpeed}"
+                                Value="{Binding Motor1Speed}"
                                 PreviewMouseWheel="SpeedSlider_PreviewMouseWheel"/>
                         <TextBlock Grid.Column="3" Text="→ 正" Style="{StaticResource FieldLabel}"
                                    Margin="10,0,16,0"/>
                         <StackPanel Grid.Column="4" Margin="0,0,16,0" VerticalAlignment="Center">
-                            <TextBlock Text="VALUE" FontSize="9" Foreground="{StaticResource TextDimBrush}"/>
-                            <TextBlock Text="{Binding LinkedSpeed}" FontWeight="Bold" MinWidth="50"
+                            <TextBlock Text="SPEED" FontSize="9" Foreground="{StaticResource TextDimBrush}"/>
+                            <TextBlock Text="{Binding Motor1Speed}" FontWeight="Bold" MinWidth="50"
                                        Foreground="{StaticResource AccentBrush}"/>
                         </StackPanel>
                     </Grid>
+
+                    <!-- ②1台目と2台目の連動比(-1〜1, マウスホイールで微調整) -->
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="110"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="② 連動比" Style="{StaticResource FieldLabel}"
+                                   Margin="0,0,12,0"/>
+                        <TextBlock Grid.Column="1" Text="-1 ←" Style="{StaticResource FieldLabel}"
+                                   Margin="0,0,10,0"/>
+                        <Slider Grid.Column="2" VerticalAlignment="Center"
+                                Minimum="-1" Maximum="1" SmallChange="0.05"
+                                Value="{Binding LinkRatio}"
+                                PreviewMouseWheel="RatioSlider_PreviewMouseWheel"/>
+                        <TextBlock Grid.Column="3" Text="→ +1" Style="{StaticResource FieldLabel}"
+                                   Margin="10,0,16,0"/>
+                        <StackPanel Grid.Column="4" Margin="0,0,16,0" VerticalAlignment="Center">
+                            <TextBlock Text="RATIO" FontSize="9" Foreground="{StaticResource TextDimBrush}"/>
+                            <TextBlock Text="{Binding LinkRatio, StringFormat={}{0:0.00}}" FontWeight="Bold"
+                                       MinWidth="50" Foreground="{StaticResource AccentBrush}"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- 連動2台の位置差分(1台目 - 2台目)と度数法換算 -->
+                    <Border Background="{StaticResource ControlBgBrush}" CornerRadius="8"
+                            Padding="12,8" Margin="0,0,0,10">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="位置差分 (1台目 - 2台目)" Style="{StaticResource FieldLabel}"
+                                       VerticalAlignment="Center" Margin="0,0,16,0"/>
+                            <StackPanel Margin="0,0,24,0" VerticalAlignment="Center">
+                                <TextBlock Text="DIFF" FontSize="9" Foreground="{StaticResource TextDimBrush}"/>
+                                <TextBlock Text="{Binding LinkedPositionDiff}" FontWeight="Bold" MinWidth="60"
+                                           Foreground="{StaticResource AccentBrush}"/>
+                            </StackPanel>
+                            <StackPanel VerticalAlignment="Center" Margin="0,0,24,0">
+                                <TextBlock Text="DEG (°)" FontSize="9" Foreground="{StaticResource TextDimBrush}"/>
+                                <TextBlock Text="{Binding LinkedPositionDiffDeg, StringFormat={}{0:0.00}°}"
+                                           FontWeight="Bold" MinWidth="60"
+                                           Foreground="{StaticResource AccentBrush}"/>
+                            </StackPanel>
+                            <!-- 現在の差分をゼロ点(0度)にする -->
+                            <Button Command="{Binding ZeroLinkedPositionDiffCommand}" Content="⟲ ここを0°に"
+                                    Padding="12,4" VerticalAlignment="Center"
+                                    ToolTip="現在の位置差分を基準(0°)として記録する"/>
+                        </StackPanel>
+                    </Border>
 
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Button Command="{Binding StartVelocityTestCommand}" Content="▶ START"
                                 Style="{StaticResource AccentButton}" Padding="18,7"/>
                         <Button Command="{Binding StopVelocityTestCommand}" Content="■ STOP"
                                 Style="{StaticResource DangerButton}" Padding="18,7" Margin="8,0,0,0"/>
-                        <TextBlock Text="ヒント: スライダーの上でマウスホイールを回すと回転速度を微調整できます"
-                                   Style="{StaticResource FieldLabel}" Margin="18,0,0,0"/>
+                        <TextBlock Text="ヒント: 連動チェックした先頭2台が対象(上=1台目)。2台目の速度 = M1速度 × 連動比。スライダー上でホイール回転で微調整可"
+                                   Style="{StaticResource FieldLabel}" Margin="18,0,0,0"
+                                   TextWrapping="Wrap" MaxWidth="520"/>
                     </StackPanel>
                 </StackPanel>
             </Border>

@@ -300,19 +300,23 @@
 
         <!-- ===== Slider ===== -->
         <Style TargetType="Slider">
-            <Setter Property="Height" Value="22"/>
+            <Setter Property="Height" Value="28"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Slider">
-                        <Grid VerticalAlignment="Center">
+                        <!-- Background=Transparent にして、細いバーの上下(縦全域)もクリックできるようにする -->
+                        <Grid Background="Transparent" VerticalAlignment="Center" MinHeight="28">
                             <Border Height="4" CornerRadius="2" Background="{StaticResource ControlBgBrush}"/>
                             <Track x:Name="PART_Track">
                                 <Track.DecreaseRepeatButton>
                                     <RepeatButton Command="Slider.DecreaseLarge">
                                         <RepeatButton.Template>
                                             <ControlTemplate TargetType="RepeatButton">
-                                                <Border Height="4" CornerRadius="2"
-                                                        Background="{StaticResource AccentBrush}"/>
+                                                <!-- 当たり判定は縦全域(透明)、見た目は中央の細いバーだけ -->
+                                                <Grid Background="Transparent">
+                                                    <Border Height="4" CornerRadius="2" VerticalAlignment="Center"
+                                                            Background="{StaticResource AccentBrush}"/>
+                                                </Grid>
                                             </ControlTemplate>
                                         </RepeatButton.Template>
                                     </RepeatButton>
@@ -321,7 +325,7 @@
                                     <RepeatButton Command="Slider.IncreaseLarge">
                                         <RepeatButton.Template>
                                             <ControlTemplate TargetType="RepeatButton">
-                                                <Border Background="Transparent" Height="22"/>
+                                                <Border Background="Transparent" Height="28"/>
                                             </ControlTemplate>
                                         </RepeatButton.Template>
                                     </RepeatButton>
@@ -330,8 +334,18 @@
                                     <Thumb>
                                         <Thumb.Template>
                                             <ControlTemplate TargetType="Thumb">
-                                                <Ellipse Width="16" Height="16" Fill="White"
-                                                         Stroke="{StaticResource AccentBrush}" StrokeThickness="2"/>
+                                                <!-- 見た目は16pxの丸だが、周囲に透明な掴みしろ(32x28)を付けて掴みやすくする -->
+                                                <Grid Background="Transparent" Width="32" Height="28">
+                                                    <Ellipse x:Name="knob" Width="16" Height="16" Fill="White"
+                                                             Stroke="{StaticResource AccentBrush}" StrokeThickness="2"/>
+                                                </Grid>
+                                                <ControlTemplate.Triggers>
+                                                    <!-- ホバー中は少し大きく見せて、掴める状態が分かるように -->
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="knob" Property="Width" Value="20"/>
+                                                        <Setter TargetName="knob" Property="Height" Value="20"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
                                             </ControlTemplate>
                                         </Thumb.Template>
                                     </Thumb>
