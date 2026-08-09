@@ -298,6 +298,67 @@
             </Setter>
         </Style>
 
+        <!-- ===== TabControl / TabItem ===== -->
+        <Style TargetType="TabControl">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+
+        <Style TargetType="TabItem">
+            <Setter Property="Foreground" Value="{StaticResource TextDimBrush}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="bd" Background="{StaticResource CardBrush}"
+                                BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1"
+                                CornerRadius="8" Margin="0,0,8,0" Padding="18,9">
+                            <ContentPresenter ContentSource="Header" HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsSelected" Value="False"/>
+                                    <Condition Property="IsMouseOver" Value="True"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                            </MultiTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 並べ替え(▲▼)用の小さなボタン -->
+        <Style x:Key="ReorderBtn" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Padding" Value="6,0"/>
+            <Setter Property="Height" Value="15"/>
+            <Setter Property="MinWidth" Value="26"/>
+            <Setter Property="FontSize" Value="8"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="Foreground" Value="{StaticResource TextDimBrush}"/>
+            <Setter Property="ToolTip" Value="上下に並べ替え(評価順が変わります)"/>
+        </Style>
+
+        <!-- 変数トークン挿入用の小さなチップボタン -->
+        <Style x:Key="TokenChip" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="Margin" Value="0,0,6,6"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+        </Style>
+
         <!-- ===== Slider ===== -->
         <Style TargetType="Slider">
             <Setter Property="Height" Value="28"/>

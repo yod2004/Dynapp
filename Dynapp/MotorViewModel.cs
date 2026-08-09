@@ -65,6 +65,20 @@ namespace Dynapp
             }
         }
 
+        /// <summary>
+        /// ハードウェアへは送らず、画面上のENABLE表示だけを更新する。
+        /// 制御停止時など、トルクOFFのハード送信を別経路で確実に行った後にUIを合わせる用途。
+        /// (IsEnableセッターだと余計なSetTorqueEnableが二重に走り、通信が混雑するため)
+        /// </summary>
+        public void SetEnableStateSilently(bool value)
+        {
+            if (_IsEnable != value)
+            {
+                _IsEnable = value;
+                NotifyPropertyChanged(nameof(IsEnable));
+            }
+        }
+
         private int _NowValue = 0;
         public int NowValue
         {
@@ -183,6 +197,130 @@ namespace Dynapp
                     NotifyPropertyChanged();
                 }
             }
+        }
+
+        // 現在速度(ポーリングで更新される生値)。制御式の vel<ID> で参照される。
+        private int _PresentVelocity = 0;
+        public int PresentVelocity
+        {
+            get => _PresentVelocity;
+            set
+            {
+                if (_PresentVelocity != value)
+                {
+                    _PresentVelocity = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+
+        // 現在電流(ポーリングで更新される生値)。制御式の cur<ID> で参照される。
+        private double _PresentCurrent = 0;
+        public double PresentCurrent
+        {
+            get => _PresentCurrent;
+            set
+            {
+                if (_PresentCurrent != value)
+                {
+                    _PresentCurrent = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+
+        // --- 制御モード(トルク制御)用 ---
+
+        // このモーターを制御モードの対象にするか
+        private bool _IsControlled;
+        public bool IsControlled
+        {
+            get => _IsControlled;
+            set
+            {
+                if (_IsControlled != value)
+                {
+                    _IsControlled = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+
+        // GUIで組み立てるトルク(目標電流)の制御式。例: k*(pos2-pos1) + d*(vel2-vel1)
+        private string _ControlExpressionText = "";
+        public string ControlExpressionText
+        {
+            get => _ControlExpressionText;
+            set
+            {
+                if (_ControlExpressionText != value)
+                {
+                    _ControlExpressionText = value;
+                    NotifyPropertyChanged();
+                    RecompileControlExpression();
+                }
+            }
+        }
+
+        // 解析済みの制御式(制御ループから評価される)
+        public ControlExpression? ControlExpression { get; private set; }
+
+        private string _ControlStatus = "";
+        public string ControlStatus
+        {
+            get => _ControlStatus;
+            private set { if (_ControlStatus != value) { _ControlStatus = value; NotifyPropertyChanged(); } }
+        }
+
+        private bool _IsControlExpressionValid;
+        public bool IsControlExpressionValid
+        {
+            get => _IsControlExpressionValid;
+            private set { if (_IsControlExpressionValid != value) { _IsControlExpressionValid = value; NotifyPropertyChanged(); } }
+        }
+
+        // 制御ループが最後に計算・送信した指令値(表示用)。モードにより電流/速度/位置。
+        private int _ControlOutput = 0;
+        public int ControlOutput
+        {
+            get => _ControlOutput;
+            set { if (_ControlOutput != value) { _ControlOutput = value; NotifyPropertyChanged(); } }
+        }
+
+        // 制御モードでの出力種別: 0=Current(電流/トルク) 1=Velocity(速度) 2=Position(位置) 3=Extended Position
+        private int _ControlModeIndex = 0;
+        public int ControlModeIndex
+        {
+            get => _ControlModeIndex;
+            set { if (_ControlModeIndex != value) { _ControlModeIndex = value; NotifyPropertyChanged(); } }
+        }
+
+        // 制御モードの仮想ゼロ点(生値)。制御式の pos<ID> は (NowValue - この値) になる。
+        // ※ソフト的なオフセットのみ。NowValue自体や手動タブ・ハードの零点は変えない。
+        private int _PositionZeroOffset = 0;
+        public int PositionZeroOffset
+        {
+            get => _PositionZeroOffset;
+            set { if (_PositionZeroOffset != value) { _PositionZeroOffset = value; NotifyPropertyChanged(); } }
+        }
+
+        // 現在地をこのモーターの仮想ゼロ点にする
+        public DelegateCommand SetZeroHereCommand => new DelegateCommand(() => PositionZeroOffset = NowValue);
+        // 仮想ゼロ点を解除(生の位置に戻す)
+        public DelegateCommand ClearZeroCommand => new DelegateCommand(() => PositionZeroOffset = 0);
+
+        private void RecompileControlExpression()
+        {
+            if (string.IsNullOrWhiteSpace(ControlExpressionText))
+            {
+                ControlExpression = null;
+                IsControlExpressionValid = false;
+                ControlStatus = "式が未入力";
+                return;
+            }
+            ControlExpression = Dynapp.ControlExpression.Parse(ControlExpressionText);
+            IsControlExpressionValid = ControlExpression.IsValid;
+            ControlStatus = ControlExpression.IsValid ? "OK" : (ControlExpression.Error ?? "式エラー");
         }
 
         // 現在このモーターに出している目標速度（表示用）

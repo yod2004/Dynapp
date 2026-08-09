@@ -14,6 +14,7 @@ namespace Dynapp
         private const int ADDR_OPERATING_MODE = 11; // 動作モード (1byte) ※トルクOFF時のみ変更可
         private const int ADDR_GOAL_VELOCITY = 104;  // Goal Velocity (4byte, 符号付き)
         private const int ADDR_GOAL_POSITION = 116;
+        private const int ADDR_GOAL_CURRENT = 102;   // Goal Current (2byte, 符号付き) ※電流(トルク)制御用
 
         // 動作モードの値 (Dynamixel Protocol 2.0 / Xシリーズ)
         public const byte OP_MODE_CURRENT = 0;
@@ -25,12 +26,23 @@ namespace Dynapp
         private const int ADDR_POSITION_P_GAIN = 84; // Position P Gain (2byte)
         private const int ADDR_PRESENT_POSITION = 132; // 現在位置のアドレス
         private const int ADDR_PRESENT_CURRENT = 126; // 電流値のアドレス (Xシリーズ想定)
+        private const int ADDR_PRESENT_VELOCITY = 128; // 現在速度のアドレス (4byte, 符号付き)
         private const int LEN_PRESENT_POSITION = 4; // 現在位置のデータ長（4byte）
         private const int LEN_PRESENT_CURRENT = 2;    // 電流値のデータ長（2byte）
+        private const int LEN_PRESENT_VELOCITY = 4;   // 現在速度のデータ長（4byte）
+        // Present Current(126,2) + Present Velocity(128,4) + Present Position(132,4) は連続アドレス。
+        // まとめて1回のGroupSyncReadで読むための先頭アドレスと長さ(10byte)。
+        private const int ADDR_STATE_BLOCK = ADDR_PRESENT_CURRENT; // 126
+        private const int LEN_STATE_BLOCK = 10;                    // 126〜135
         private int _portNum = -1;
         private readonly object _lockObj = new object();
         private int _groupSyncReadNum = -1;
         private int _groupSyncReadCurrentNum = -1;
+        private int _groupSyncReadVelocityNum = -1;
+        private int _groupSyncReadStateNum = -1;
+        private int _groupSyncWriteCurrentNum = -1;
+        private int _groupSyncWriteVelocityNum = -1;
+        private int _groupSyncWritePositionNum = -1;
 
         /// <summary>
         /// 指定したCOMポートとボーレートでDynamixelと接続する
@@ -60,6 +72,11 @@ namespace Dynapp
             }
             _groupSyncReadNum = Dynamixel.groupSyncRead(_portNum, PROTOCOL_VERSION, ADDR_PRESENT_POSITION, LEN_PRESENT_POSITION);
             _groupSyncReadCurrentNum = Dynamixel.groupSyncRead(_portNum, PROTOCOL_VERSION, ADDR_PRESENT_CURRENT, LEN_PRESENT_CURRENT);
+            _groupSyncReadVelocityNum = Dynamixel.groupSyncRead(_portNum, PROTOCOL_VERSION, ADDR_PRESENT_VELOCITY, LEN_PRESENT_VELOCITY);
+            _groupSyncReadStateNum = Dynamixel.groupSyncRead(_portNum, PROTOCOL_VERSION, ADDR_STATE_BLOCK, LEN_STATE_BLOCK);
+            _groupSyncWriteCurrentNum = Dynamixel.groupSyncWrite(_portNum, PROTOCOL_VERSION, ADDR_GOAL_CURRENT, 2);
+            _groupSyncWriteVelocityNum = Dynamixel.groupSyncWrite(_portNum, PROTOCOL_VERSION, ADDR_GOAL_VELOCITY, 4);
+            _groupSyncWritePositionNum = Dynamixel.groupSyncWrite(_portNum, PROTOCOL_VERSION, ADDR_GOAL_POSITION, 4);
             System.Diagnostics.Debug.WriteLine($"接続成功: {portName} ({baudRate} bps)");
             return true;
         }
@@ -134,6 +151,149 @@ namespace Dynapp
             lock (_lockObj)
             {
                 Dynamixel.write4ByteTxRx(_portNum, PROTOCOL_VERSION, motorId, ADDR_GOAL_VELOCITY, (uint)velocity);
+            }
+        }
+
+        /// <summary>
+        /// 電流(トルク)制御モード用のGoal Current(目標電流)を書き込む。
+        /// 単位はモデル依存(生値)。符号(±)でトルクの向きが決まる。2byte符号付き。
+        /// </summary>
+        public void SetGoalCurrent(byte motorId, int current)
+        {
+            if (_portNum == -1) return; // 未接続なら何もしない
+            // 2byte符号付き(short)の範囲に収めてから、SDKが要求するushortへビット変換する
+            short clamped = (short)Math.Max(short.MinValue, Math.Min(short.MaxValue, current));
+            lock (_lockObj)
+            {
+                Dynamixel.write2ByteTxRx(_portNum, PROTOCOL_VERSION, motorId, ADDR_GOAL_CURRENT, (ushort)clamped);
+            }
+        }
+
+        /// <summary>モーター1台の状態(位置・速度・電流)をまとめて表す。</summary>
+        public struct MotorState
+        {
+            public int Position;
+            public int Velocity;
+            public double Current; // mA相当の生値(符号付き)
+        }
+
+        /// <summary>
+        /// 複数モーターの位置・速度・電流を「1回の通信」で一括取得する (GroupSyncRead)。
+        /// 連続アドレス(126〜135)をまとめて読むので、読み取りトランザクションが1回で済み、
+        /// FTDIレイテンシの影響を受ける回数が減って制御周期を上げやすい。
+        /// </summary>
+        public Dictionary<byte, MotorState> ReadAllStates(byte[] motorIds)
+        {
+            if (_portNum == -1 || _groupSyncReadStateNum == -1) return null;
+
+            lock (_lockObj)
+            {
+                Dynamixel.groupSyncReadClearParam(_groupSyncReadStateNum);
+                foreach (byte id in motorIds)
+                    Dynamixel.groupSyncReadAddParam(_groupSyncReadStateNum, id);
+                Dynamixel.groupSyncReadTxRxPacket(_groupSyncReadStateNum);
+
+                var results = new Dictionary<byte, MotorState>();
+                foreach (byte id in motorIds)
+                {
+                    bool okC = Dynamixel.groupSyncReadIsAvailable(_groupSyncReadStateNum, id, ADDR_PRESENT_CURRENT, LEN_PRESENT_CURRENT);
+                    bool okV = Dynamixel.groupSyncReadIsAvailable(_groupSyncReadStateNum, id, ADDR_PRESENT_VELOCITY, LEN_PRESENT_VELOCITY);
+                    bool okP = Dynamixel.groupSyncReadIsAvailable(_groupSyncReadStateNum, id, ADDR_PRESENT_POSITION, LEN_PRESENT_POSITION);
+                    if (!(okC || okV || okP)) continue;
+
+                    var st = new MotorState();
+                    if (okC)
+                    {
+                        // 2byte符号付き(short)として解釈(正負の負荷を表す)
+                        short raw = (short)Dynamixel.groupSyncReadGetData(_groupSyncReadStateNum, id, ADDR_PRESENT_CURRENT, LEN_PRESENT_CURRENT);
+                        st.Current = raw;
+                    }
+                    if (okV)
+                        st.Velocity = (int)Dynamixel.groupSyncReadGetData(_groupSyncReadStateNum, id, ADDR_PRESENT_VELOCITY, LEN_PRESENT_VELOCITY);
+                    if (okP)
+                        st.Position = (int)Dynamixel.groupSyncReadGetData(_groupSyncReadStateNum, id, ADDR_PRESENT_POSITION, LEN_PRESENT_POSITION);
+                    results[id] = st;
+                }
+                return results;
+            }
+        }
+
+        /// <summary>
+        /// 複数のモーターへの目標電流(トルク)を1回の通信で一括送信する (GroupSyncWrite)。
+        /// 台数ぶんの個別TxRxが1トランザクションにまとまるので、制御周期を上げやすい。
+        /// </summary>
+        public void SetGoalCurrentsSync(IReadOnlyDictionary<byte, int> currents)
+        {
+            if (_portNum == -1 || _groupSyncWriteCurrentNum == -1 || currents.Count == 0) return;
+            lock (_lockObj)
+            {
+                Dynamixel.groupSyncWriteClearParam(_groupSyncWriteCurrentNum);
+                foreach (var kv in currents)
+                {
+                    // 2byte符号付きの範囲に収めてから、SDKが要求する符号なしデータへビット変換する
+                    short clamped = (short)Math.Max(short.MinValue, Math.Min(short.MaxValue, kv.Value));
+                    Dynamixel.groupSyncWriteAddParam(_groupSyncWriteCurrentNum, kv.Key, (ushort)clamped, 2);
+                }
+                Dynamixel.groupSyncWriteTxPacket(_groupSyncWriteCurrentNum);
+                Dynamixel.groupSyncWriteClearParam(_groupSyncWriteCurrentNum);
+            }
+        }
+
+        /// <summary>複数モーターへの目標速度(4byte符号付き)を1回の通信で一括送信する。</summary>
+        public void SetGoalVelocitiesSync(IReadOnlyDictionary<byte, int> velocities)
+        {
+            if (_portNum == -1 || _groupSyncWriteVelocityNum == -1 || velocities.Count == 0) return;
+            lock (_lockObj)
+            {
+                Dynamixel.groupSyncWriteClearParam(_groupSyncWriteVelocityNum);
+                foreach (var kv in velocities)
+                    Dynamixel.groupSyncWriteAddParam(_groupSyncWriteVelocityNum, kv.Key, (uint)kv.Value, 4);
+                Dynamixel.groupSyncWriteTxPacket(_groupSyncWriteVelocityNum);
+                Dynamixel.groupSyncWriteClearParam(_groupSyncWriteVelocityNum);
+            }
+        }
+
+        /// <summary>複数モーターへの目標位置(4byte)を1回の通信で一括送信する。</summary>
+        public void SetGoalPositionsSync(IReadOnlyDictionary<byte, int> positions)
+        {
+            if (_portNum == -1 || _groupSyncWritePositionNum == -1 || positions.Count == 0) return;
+            lock (_lockObj)
+            {
+                Dynamixel.groupSyncWriteClearParam(_groupSyncWritePositionNum);
+                foreach (var kv in positions)
+                    Dynamixel.groupSyncWriteAddParam(_groupSyncWritePositionNum, kv.Key, (uint)kv.Value, 4);
+                Dynamixel.groupSyncWriteTxPacket(_groupSyncWritePositionNum);
+                Dynamixel.groupSyncWriteClearParam(_groupSyncWritePositionNum);
+            }
+        }
+
+        /// <summary>
+        /// 複数のモーターの現在速度を一括で取得する (GroupSyncRead)。値は符号付きの生値。
+        /// </summary>
+        public Dictionary<byte, int> ReadAllVelocities(byte[] motorIds)
+        {
+            if (_portNum == -1 || _groupSyncReadVelocityNum == -1) return null;
+
+            lock (_lockObj)
+            {
+                Dynamixel.groupSyncReadClearParam(_groupSyncReadVelocityNum);
+                foreach (byte id in motorIds)
+                {
+                    Dynamixel.groupSyncReadAddParam(_groupSyncReadVelocityNum, id);
+                }
+                Dynamixel.groupSyncReadTxRxPacket(_groupSyncReadVelocityNum);
+
+                var results = new Dictionary<byte, int>();
+                foreach (byte id in motorIds)
+                {
+                    if (Dynamixel.groupSyncReadIsAvailable(_groupSyncReadVelocityNum, id, ADDR_PRESENT_VELOCITY, LEN_PRESENT_VELOCITY))
+                    {
+                        // 4byte符号付きとして解釈する(逆回転が負になるように)
+                        uint raw = Dynamixel.groupSyncReadGetData(_groupSyncReadVelocityNum, id, ADDR_PRESENT_VELOCITY, LEN_PRESENT_VELOCITY);
+                        results[id] = (int)raw;
+                    }
+                }
+                return results;
             }
         }
 
